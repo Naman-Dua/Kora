@@ -1,35 +1,49 @@
-from ears import listen
-from voice import speak
+from ears import listen # Use your faster-whisper code
+from voice import speak # Use your pyttsx3 code
 from vision import scan_for_master
-from monitor import check_system_health, get_system_vitals
+from monitor import get_system_vitals, check_health
+from search_engine import search_online
+from jarvis_engine import JarvisBrain
+
+brain = JarvisBrain()
 
 def run_jarvis():
-    # Security Scan First
+    # 1. Security Check
     if not scan_for_master():
+        print("Unauthorized access.")
         return
 
-    speak("All sensors online. Monitoring system health in background.")
+    speak("Recognition complete. All systems nominal. How can I help, sir?")
 
     while True:
-        # 1. Background Health Check
-        health_alerts = check_system_health()
-        for alert in health_alerts:
-            speak(alert)
+        # 2. Check Hardware Health
+        alert = check_health()
+        if alert: speak(alert)
 
-        # 2. Listen for Master's Commands
+        # 3. Process Commands
         user_input = listen()
-        if not user_input: continue
+        if not user_input or len(user_input) < 3: continue
         
-        user_cmd = user_input.lower()
+        cmd = user_input.lower()
 
-        # Specific command for a full report
-        if "status report" in user_cmd or "system status" in user_cmd:
-            vitals = get_system_vitals()
-            report = f"CPU is at {vitals['cpu']} percent. Memory is at {vitals['ram']} percent. Battery is {vitals['battery']}."
-            speak(report)
-            
-        elif "go to sleep" in user_cmd:
-            speak("Powering down, sir.")
+        if "search" in cmd:
+            query = cmd.replace("search", "").strip()
+            speak(f"Scanning the web for {query}...")
+            info = search_online(query)
+            brain.learn(info)
+            speak(info)
+
+        elif "status" in cmd or "report" in cmd:
+            v = get_system_vitals()
+            speak(f"CPU at {v['cpu']} percent. Memory at {v['ram']} percent. Battery is {v['battery']}.")
+
+        elif "go to sleep" in cmd or "exit" in cmd:
+            speak("Powering down. Goodbye, sir.")
             break
-            
-        # ... Add your other logic (Search/Learn) here ...
+
+        else:
+            brain.learn(user_input)
+            speak("I've stored that in my database.")
+
+if __name__ == "__main__":
+    run_jarvis()
