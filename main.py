@@ -1,49 +1,54 @@
-from ears import listen # Use your faster-whisper code
-from voice import speak # Use your pyttsx3 code
-from vision import scan_for_master
-from monitor import get_system_vitals, check_health
-from search_engine import search_online
-from jarvis_engine import JarvisBrain
+import threading
+import sys
+import os
+from PyQt6.QtWidgets import QApplication
+from PyQt6.QtCore import QCoreApplication
+from gui import AuraHUD
+from brain import AuraBrain
+from tasks import check_for_tasks
+from voice import speak
+from ears import listen
 
-brain = JarvisBrain()
+brain = AuraBrain()
 
-def run_jarvis():
-    # 1. Security Check
-    if not scan_for_master():
-        print("Unauthorized access.")
-        return
-
-    speak("Recognition complete. All systems nominal. How can I help, sir?")
+def aura_logic(ui):
+    speak("Welcome back, sir. Systems are online.")
+    ui.status_signal.emit("SYSTEM ONLINE")
 
     while True:
-        # 2. Check Hardware Health
-        alert = check_health()
-        if alert: speak(alert)
-
-        # 3. Process Commands
-        user_input = listen()
-        if not user_input or len(user_input) < 3: continue
+        query = listen()
+        if not query: continue
         
-        cmd = user_input.lower()
+        ui.status_signal.emit("PROCESSING...")
+        cmd = query.lower()
 
-        if "search" in cmd:
-            query = cmd.replace("search", "").strip()
-            speak(f"Scanning the web for {query}...")
-            info = search_online(query)
-            brain.learn(info)
-            speak(info)
-
-        elif "status" in cmd or "report" in cmd:
-            v = get_system_vitals()
-            speak(f"CPU at {v['cpu']} percent. Memory at {v['ram']} percent. Battery is {v['battery']}.")
-
-        elif "go to sleep" in cmd or "exit" in cmd:
+        # FIXED POWER DOWN (No Freezing)
+        if any(word in cmd for word in ["shutdown", "power down", "exit"]):
             speak("Powering down. Goodbye, sir.")
-            break
+            QCoreApplication.quit()
+            os._exit(0) # Immediate terminal-level kill
 
-        else:
-            brain.learn(user_input)
-            speak("I've stored that in my database.")
+        # Task/Reminder Logic
+        task = check_for_tasks(cmd)
+        if task:
+            speak(task["reply"])
+            brain.learn(f"TASK: {task['task']}")
+            ui.status_signal.emit("TASK LOGGED")
+            continue
+
+        # General Reply
+        brain.learn(query)
+        res = brain.generate_reply(query)
+        speak(res)
+        ui.status_signal.emit("SYSTEM ONLINE")
 
 if __name__ == "__main__":
-    run_jarvis()
+    app = QApplication(sys.argv)
+    hud = AuraHUD()
+    hud.show()
+
+    # Start logic thread
+    t = threading.Thread(target=aura_logic, args=(hud,), daemon=True)
+    t.start()
+
+    sys.exit(app.exec())
