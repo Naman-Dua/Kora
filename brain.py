@@ -7,7 +7,7 @@ class AuraBrain:
     def __init__(self):
         init_db()
         
-        self.model_name = "gemma4:26b" # Using Gemma as requested
+        self.model_name = "llama3.1:8b" # Swapped to Llama 8B which is much faster
 
         self.system_instruction = (
             "You are Aura, a highly capable, polite, and beautiful AI assistant. "
