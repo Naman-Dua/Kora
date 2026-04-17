@@ -3,7 +3,7 @@ import math
 import random
 from PyQt6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
                              QLabel, QTextEdit, QFrame)
-from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QDateTime
+from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QDateTime, QRectF
 from PyQt6.QtGui import QPainter, QColor, QPen, QRadialGradient, QLinearGradient, QFont, QPainterPath
 
 from monitor import get_system_vitals
@@ -23,7 +23,7 @@ class GlassPanel(QFrame):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
         
-        rect = self.rect().adjusted(2, 2, -2, -2)
+        rect = QRectF(self.rect().adjusted(2, 2, -2, -2))
         path = QPainterPath()
         path.addRoundedRect(rect, 20, 20)
         
@@ -165,7 +165,7 @@ class AuraOrbWidget(QWidget):
         # Outer containment glass ring
         p.setBrush(Qt.GlobalColor.transparent)
         ring_pen = QPen(QColor(0, 255, 255, 40))
-        ring_pen.setWidth(1.5)
+        ring_pen.setWidthF(1.5)
         p.setPen(ring_pen)
         p.drawEllipse(int(cx - 150), int(cy - 150), 300, 300)
 
@@ -226,7 +226,7 @@ class AuraDashboard(QMainWindow):
         font = QFont("Segoe UI", 18, QFont.Weight.Bold)
         font.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, 8)
         self.status_label.setFont(font)
-        self.status_label.setStyleSheet("color: #FFFFFF; text-shadow: 0 0 10px #00d2ff;")
+        self.status_label.setStyleSheet("color: #FFFFFF;")
         
         left_layout.addWidget(self.orb, alignment=Qt.AlignmentFlag.AlignCenter)
         left_layout.addStretch()
