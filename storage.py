@@ -1,48 +1,118 @@
 import sqlite3
 
-DB_PATH = 'aura_memory.db'
+DB_PATH = 'kora_memory.db'
+
 
 def init_db():
-    """Initialize the database and ensure the unified schema is in place.
-    Safe to call multiple times — uses CREATE IF NOT EXISTS and ALTER TABLE migration.
-    """
+    """Initialize all tables. Safe to call multiple times."""
     with sqlite3.connect(DB_PATH) as conn:
-        conn.execute('''CREATE TABLE IF NOT EXISTS memories
-                        (id       INTEGER PRIMARY KEY,
-                         category TEXT,
-                         content  TEXT,
-                         timestamp DATETIME DEFAULT CURRENT_TIMESTAMP)''')
-        # Migration: add 'category' column for databases created by the old brain.py schema.
-        try:
-            conn.execute("ALTER TABLE memories ADD COLUMN category TEXT")
-        except sqlite3.OperationalError:
-            pass  # Column already exists — nothing to do.
+
+        # --- Long-term facts/memory ---
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS memories (
+                id        INTEGER PRIMARY KEY,
+                category  TEXT,
+                content   TEXT UNIQUE,
+                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+
+        # --- Full conversation log (persists across restarts) ---
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS conversation_logs (
+                id        INTEGER PRIMARY KEY,
+                role      TEXT NOT NULL,
+                content   TEXT NOT NULL,
+                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+
+        # Index for fast keyword search on memories
+        conn.execute('''
+            CREATE INDEX IF NOT EXISTS idx_memory_content
+            ON memories (content)
+        ''')
+
         conn.commit()
 
+
+# ──────────────────────────────────────────────
+#  MEMORY  (long-term facts)
+# ──────────────────────────────────────────────
+
 def store_info(category, content):
-    """Insert a memory entry, skipping duplicates (same content already stored)."""
+    """Insert a memory entry, skipping exact duplicates."""
     with sqlite3.connect(DB_PATH) as conn:
-        cur = conn.cursor()
-        # Bug fix: deduplicate — don't store the same content twice.
-        cur.execute("SELECT id FROM memories WHERE content = ?", (content,))
-        if not cur.fetchone():
+        try:
             conn.execute(
                 "INSERT INTO memories (category, content) VALUES (?, ?)",
                 (category, content)
             )
             conn.commit()
+        except sqlite3.IntegrityError:
+            pass  # UNIQUE constraint — already stored
+
 
 def retrieve_info(keyword):
-    """Return all memory contents that contain the given keyword."""
+    """Return memory contents that contain the keyword."""
     with sqlite3.connect(DB_PATH) as conn:
         cur = conn.cursor()
         cur.execute(
-            "SELECT content FROM memories WHERE content LIKE ?",
+            "SELECT content FROM memories WHERE content LIKE ? LIMIT 10",
             ('%' + keyword + '%',)
         )
         return [r[0] for r in cur.fetchall()]
 
-# Bug fix (Bug 12): Do NOT call init_db() here at module level.
-# Calling it on import is a side effect that breaks testing and runs
-# even in scripts that never need the DB. Call init_db() explicitly
-# at app startup (brain.py JarvisBrain.__init__ handles this).
+
+# ──────────────────────────────────────────────
+#  CONVERSATION LOGS  (persistent chat history)
+# ──────────────────────────────────────────────
+
+def save_message(role, content):
+    """Append a single message (user or assistant) to the persistent log."""
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute(
+            "INSERT INTO conversation_logs (role, content) VALUES (?, ?)",
+            (role, content)
+        )
+        conn.commit()
+
+
+def load_recent_history(limit=40):
+    """
+    Load the last `limit` messages from the log as a list of
+    {'role': ..., 'content': ...} dicts — ready for ollama.chat().
+    """
+    with sqlite3.connect(DB_PATH) as conn:
+        cur = conn.cursor()
+        cur.execute(
+            '''
+            SELECT role, content FROM conversation_logs
+            ORDER BY id DESC LIMIT ?
+            ''',
+            (limit,)
+        )
+        rows = cur.fetchall()
+
+    # Reverse so oldest is first (correct chronological order for the LLM)
+    return [{'role': row[0], 'content': row[1]} for row in reversed(rows)]
+
+
+def load_all_logs():
+    """
+    Return every log entry as (timestamp, role, content) tuples.
+    Used by the GUI to populate the log panel on startup.
+    """
+    with sqlite3.connect(DB_PATH) as conn:
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT timestamp, role, content FROM conversation_logs ORDER BY id ASC"
+        )
+        return cur.fetchall()
+
+
+def clear_conversation_logs():
+    """Wipe the conversation history (keeps long-term memories intact)."""
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute("DELETE FROM conversation_logs")
+        conn.commit()

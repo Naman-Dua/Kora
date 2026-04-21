@@ -9,19 +9,19 @@ from PyQt6.QtWidgets import QApplication
 from PyQt6.QtCore import QCoreApplication
 from actions import perform_action
 from screen_analysis import analyze_screen, is_screen_request
-from gui import AuraDashboard
-from brain import AuraBrain
+from gui import KoraDashboard
+from brain import KoraBrain
 from tasks import ReminderManager, check_for_tasks
 from voice import speak
 from ears import extract_wake_command, listen
 
-brain = AuraBrain()
+brain = KoraBrain()
 reminder_manager = ReminderManager()
 sleep_mode = threading.Event()
 wake_notice_pending = threading.Event()
 active_alert_ids = set()
 active_alerts_lock = threading.Lock()
-ENABLE_WAKE_WORD = os.getenv("AURA_ENABLE_WAKE_WORD", "0").lower() in {"1", "true", "yes", "on"}
+ENABLE_WAKE_WORD = os.getenv("KORA_ENABLE_WAKE_WORD", "0").lower() in {"1", "true", "yes", "on"}
 WAKE_STATUS = "LISTENING FOR WAKE WORD"
 COMMAND_STATUS = "LISTENING FOR COMMAND"
 DEFAULT_LISTENING_STATUS = WAKE_STATUS if ENABLE_WAKE_WORD else "LISTENING..."
@@ -32,10 +32,18 @@ SHUTDOWN_COMMANDS = {
     "shutdown",
     "power down",
     "exit",
-    "exit aura",
-    "quit aura",
-    "shutdown aura",
-    "close aura",
+    "exit kora",
+    "quit kora",
+    "shutdown kora",
+    "close kora",
+}
+RESET_COMMANDS = {
+    "forget everything",
+    "reset conversation",
+    "clear memory",
+    "start fresh",
+    "wipe memory",
+    "clear conversation",
 }
 SLEEP_COMMANDS = {
     "go to sleep",
@@ -68,7 +76,7 @@ DISMISS_ALERT_COMMANDS = {
 
 def normalize_voice_command(cmd):
     normalized = re.sub(r"[^a-z0-9'\s]+", " ", str(cmd).lower())
-    normalized = re.sub(r"\b(aura|please)\b", " ", normalized)
+    normalized = re.sub(r"\b(kora|please)\b", " ", normalized)
     return " ".join(normalized.split())
 
 
@@ -114,7 +122,7 @@ def handle_wake_transition(ui):
         return
 
     wake_notice_pending.clear()
-    ui.log_signal.emit("SYSTEM", "Aura is awake again.")
+    ui.log_signal.emit("SYSTEM", "Kora is awake again.")
     ui.status_signal.emit("SPEAKING...")
     speak("I'm awake.")
     ui.status_signal.emit(DEFAULT_LISTENING_STATUS)
@@ -221,10 +229,10 @@ def deliver_reminder_alert(ui, item):
     finally:
         clear_active_alert(item.id)
 
-def aura_logic(ui):
+def kora_logic(ui):
     ui.status_signal.emit("SYSTEM ONLINE")
-    ui.log_signal.emit("SYSTEM", "Aura core initialized. Native graphics engaged.")
-    speak("Welcome back, sir. Systems are online.")
+    ui.log_signal.emit("SYSTEM", "Kora core initialized. Native graphics engaged.")
+    speak("Welcome back. All systems are online and memory is loaded.")
     if ENABLE_WAKE_WORD:
         ui.log_signal.emit("SYSTEM", "Wake word mode enabled.")
     else:
@@ -244,9 +252,20 @@ def aura_logic(ui):
             # INSTANT POWER DOWN (Zero Freezing)
             if cmd.strip() in SHUTDOWN_COMMANDS:
                 ui.log_signal.emit("SYSTEM", "Shutting down immediately. Goodbye.")
-                print("\nAURA: Shutting down immediately.")
+                print("\nKORA: Shutting down immediately.")
                 QCoreApplication.quit()
                 os._exit(0) # Immediate OS-level process kill
+
+            # Conversation reset (clears DB log + RAM history)
+            normalized_cmd = normalize_voice_command(cmd)
+            if command_matches(normalized_cmd, RESET_COMMANDS):
+                brain.reset_conversation()
+                reset_reply = "Done. Conversation history cleared. Starting fresh."
+                ui.log_signal.emit("KORA", reset_reply)
+                ui.status_signal.emit("SPEAKING...")
+                speak(reset_reply)
+                ui.status_signal.emit(DEFAULT_LISTENING_STATUS)
+                continue
 
             if is_dismiss_alert_request(cmd):
                 dismissed = dismiss_all_alerts()
@@ -255,7 +274,7 @@ def aura_logic(ui):
                     if dismissed
                     else "There is no active reminder alert right now."
                 )
-                ui.log_signal.emit("AURA", dismiss_reply)
+                ui.log_signal.emit("KORA", dismiss_reply)
                 ui.status_signal.emit("SPEAKING...")
                 speak(dismiss_reply)
                 ui.status_signal.emit(SLEEPING_STATUS if sleep_mode.is_set() else DEFAULT_LISTENING_STATUS)
@@ -263,8 +282,8 @@ def aura_logic(ui):
 
             if is_sleep_request(cmd):
                 sleep_mode.set()
-                sleep_reply = "Going to sleep. Say Hey Aura to wake me."
-                ui.log_signal.emit("AURA", sleep_reply)
+                sleep_reply = "Going to sleep. Say Hey Kora to wake me."
+                ui.log_signal.emit("KORA", sleep_reply)
                 ui.status_signal.emit("SPEAKING...")
                 speak(sleep_reply)
                 ui.status_signal.emit(SLEEPING_STATUS)
@@ -273,7 +292,7 @@ def aura_logic(ui):
             # Desktop Action Logic
             action_reply = perform_action(cmd)
             if action_reply:
-                ui.log_signal.emit("AURA", action_reply)
+                ui.log_signal.emit("KORA", action_reply)
                 ui.status_signal.emit("SPEAKING...")
                 speak(action_reply)
                 ui.status_signal.emit(DEFAULT_LISTENING_STATUS)
@@ -281,7 +300,7 @@ def aura_logic(ui):
 
             if is_screen_request(cmd):
                 screen_reply = analyze_screen(query)
-                ui.log_signal.emit("AURA", screen_reply)
+                ui.log_signal.emit("KORA", screen_reply)
                 ui.status_signal.emit("SPEAKING...")
                 speak(screen_reply)
                 ui.status_signal.emit(DEFAULT_LISTENING_STATUS)
@@ -290,7 +309,7 @@ def aura_logic(ui):
             # Task/Reminder Logic
             task = check_for_tasks(cmd, reminder_manager)
             if task:
-                ui.log_signal.emit("AURA", task["reply"])
+                ui.log_signal.emit("KORA", task["reply"])
                 ui.status_signal.emit("SPEAKING...")
                 speak(task["reply"])
                 if task.get("action") == "schedule" and task.get("item"):
@@ -306,7 +325,7 @@ def aura_logic(ui):
             
             res = brain.generate_reply(query)
             
-            ui.log_signal.emit("AURA", res)
+            ui.log_signal.emit("KORA", res)
             ui.status_signal.emit("SPEAKING...")
             speak(res)
             ui.status_signal.emit(DEFAULT_LISTENING_STATUS)
@@ -319,11 +338,11 @@ def aura_logic(ui):
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    hud = AuraDashboard()
+    hud = KoraDashboard()
     hud.show()
 
     # Start logic thread
-    t = threading.Thread(target=aura_logic, args=(hud,), daemon=True)
+    t = threading.Thread(target=kora_logic, args=(hud,), daemon=True)
     t.start()
     reminder_thread = threading.Thread(target=reminder_loop, args=(hud,), daemon=True)
     reminder_thread.start()

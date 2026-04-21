@@ -102,7 +102,7 @@ def analyze_screen(query):
         response = ollama.generate(
             model=model_name,
             prompt=(
-                "You are analyzing a Windows desktop screenshot for Aura. "
+                "You are analyzing a Windows desktop screenshot for Kora. "
                 "Answer the user's request directly and briefly. "
                 f"User request: {query}"
             ),

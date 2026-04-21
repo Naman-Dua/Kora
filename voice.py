@@ -11,7 +11,7 @@ try:
 except ImportError:
     edge_tts = None
 
-EDGE_VOICE = os.getenv("AURA_EDGE_VOICE", "en-US-AriaNeural")
+EDGE_VOICE = os.getenv("KORA_EDGE_VOICE", "en-US-AriaNeural")
 WINDOWS_POWERSHELL = r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe"
 _speak_lock = threading.Lock()
 
@@ -92,7 +92,7 @@ def speak(text):
     if not cleaned:
         return
 
-    print(f"AURA: {cleaned}")
+    print(f"KORA: {cleaned}")
     with _speak_lock:
         if edge_tts is not None:
             try:

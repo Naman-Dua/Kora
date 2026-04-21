@@ -114,7 +114,7 @@ ACTION_PATTERNS = {
     "close": re.compile(r"\b(close|quit|stop|exit)\b"),
 }
 LEADING_FILLER_PATTERN = re.compile(
-    r"^(?:hey aura|aura|can you|could you|would you|please|hey|hi|just|for me)\s+",
+    r"^(?:hey kora|kora|can you|could you|would you|please|hey|hi|just|for me)\s+",
     re.IGNORECASE,
 )
 TRAILING_FILLER_PATTERN = re.compile(

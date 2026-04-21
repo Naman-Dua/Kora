@@ -19,10 +19,10 @@ MIN_SPEECH_DURATION = 0.5     # Ignore bursts shorter than this (noise filtering
 MAX_RECORD_SECONDS = 30       # Safety cap so it never records forever
 CHUNK_DURATION = 0.1          # Read audio in 100ms chunks
 WAKE_WORD_PATTERNS = [
-    re.compile(r"\bhey\s+aura\b", re.IGNORECASE),
-    re.compile(r"\bhi\s+aura\b", re.IGNORECASE),
-    re.compile(r"\bwake\s+up\s+aura\b", re.IGNORECASE),
-    re.compile(r"\baura\s+wake\s+up\b", re.IGNORECASE),
+    re.compile(r"\bhey\s+kora\b", re.IGNORECASE),
+    re.compile(r"\bhi\s+kora\b", re.IGNORECASE),
+    re.compile(r"\bwake\s+up\s+kora\b", re.IGNORECASE),
+    re.compile(r"\bkora\s+wake\s+up\b", re.IGNORECASE),
 ]
 
 def listen():
