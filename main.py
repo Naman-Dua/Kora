@@ -17,6 +17,10 @@ from brain import KoraBrain
 from tasks import ReminderManager, check_for_tasks
 from voice import speak
 from ears import extract_wake_command, listen, calibrate_microphone
+from mode_select import ask_mode
+
+# Set by the startup dialog — "voice", "text", or "both"
+INPUT_MODE = "both"   # overwritten at launch
 
 # ── Core objects ──────────────────────────────────────────────────────────────
 brain            = KoraBrain()
@@ -235,22 +239,23 @@ def kora_logic(ui):
     this loop doesn't care which, it handles both identically.
     """
     ui.status_signal.emit("SYSTEM ONLINE")
-    ui.log_signal.emit("SYSTEM", "Kora core initialized.")
+    ui.log_signal.emit("SYSTEM", f"Kora initialized — mode: {INPUT_MODE.upper()}")
 
-    # Calibrate mic at startup
-    ui.status_signal.emit("CALIBRATING MIC...")
-    ui.log_signal.emit("SYSTEM", "Calibrating microphone — stay silent for 2 seconds...")
-    calibrate_microphone(duration=2.0)
-    ui.log_signal.emit("SYSTEM", "Microphone calibrated. You can type or speak.")
+    # Only calibrate mic if voice input is active
+    if INPUT_MODE in ("voice", "both"):
+        ui.status_signal.emit("CALIBRATING MIC...")
+        ui.log_signal.emit("SYSTEM", "Calibrating microphone — stay silent for 2 seconds...")
+        calibrate_microphone(duration=2.0)
+        ui.log_signal.emit("SYSTEM", "Microphone calibrated.")
 
-    speak("Welcome back. Systems online. You can speak or type to me.")
-
-    if ENABLE_WAKE_WORD:
-        ui.log_signal.emit("SYSTEM", "Wake word mode enabled.")
-    else:
-        ui.log_signal.emit("SYSTEM", "Direct listening active.")
-
-    ui.status_signal.emit(DEFAULT_LISTENING_STATUS)
+    mode_msg = {
+        "voice": "Voice mode active. Just speak.",
+        "text":  "Text mode active. Type below and press Enter.",
+        "both":  "Voice and text active. Speak or type — both work.",
+    }.get(INPUT_MODE, "Systems online.")
+    speak(mode_msg) if INPUT_MODE in ("voice", "both") else None
+    ui.log_signal.emit("SYSTEM", mode_msg)
+    ui.status_signal.emit(DEFAULT_LISTENING_STATUS if INPUT_MODE != "text" else "TEXT MODE")
 
     # Handle wake transition once voice loop wakes from sleep
     def handle_wake_transition():
@@ -387,9 +392,8 @@ def kora_logic(ui):
             ui.log_signal.emit("KORA", res)
             ui.status_signal.emit("SPEAKING...")
 
-            # Speak only if the command came from voice
-            # For typed input, response is shown but NOT spoken (less jarring)
-            if source == "voice":
+            # Speak only for voice input or voice-capable modes
+            if source == "voice" or INPUT_MODE == "voice":
                 speak(res)
 
             ui.status_signal.emit(DEFAULT_LISTENING_STATUS)
@@ -409,19 +413,25 @@ def kora_logic(ui):
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    hud = KoraDashboard()
+
+    # ── Show mode selector before anything else ───────────────────────────────
+    from mode_select import ask_mode
+    INPUT_MODE = ask_mode()          # blocks until user picks, then returns
+
+    hud = KoraDashboard(input_mode=INPUT_MODE)
     hud.show()
 
     # Connect text input signal to queue handler
     hud.text_input_signal.connect(on_text_submitted)
 
-    # Voice listener — runs forever in background, puts into command_queue
-    voice_thread = threading.Thread(
-        target=voice_listener_loop, args=(hud,), daemon=True
-    )
-    voice_thread.start()
+    # Only start voice listener if mode includes voice
+    if INPUT_MODE in ("voice", "both"):
+        voice_thread = threading.Thread(
+            target=voice_listener_loop, args=(hud,), daemon=True
+        )
+        voice_thread.start()
 
-    # Main logic — reads from command_queue and responds
+    # Main logic thread
     logic_thread = threading.Thread(
         target=kora_logic, args=(hud,), daemon=True
     )

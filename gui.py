@@ -138,7 +138,7 @@ class KoraSphereWidget(QWidget):
 class KoraDashboard(QMainWindow):
     status_signal      = pyqtSignal(str)
     log_signal         = pyqtSignal(str, str)
-    text_input_signal  = pyqtSignal(str)   # emitted when user submits typed text
+    text_input_signal  = pyqtSignal(str)
 
     LOG_COLORS = {
         "USER":         "#ffffff",
@@ -148,7 +148,9 @@ class KoraDashboard(QMainWindow):
         "REMINDER":     "#ffaa00",
     }
 
-    def __init__(self):
+    def __init__(self, input_mode: str = "both"):
+        super().__init__()
+        self.input_mode = input_mode   # "voice" | "text" | "both"
         super().__init__()
         self.setWindowTitle("KORA")
         self.setWindowFlags(
@@ -183,8 +185,9 @@ class KoraDashboard(QMainWindow):
         self.status_label.setStyleSheet("color: #00d2ff; background: transparent;")
         left_layout.addWidget(self.status_label)
 
-        # Mic / keyboard mode indicator
-        self.mode_label = QLabel("🎙  VOICE + TYPE  ⌨")
+        # Mode indicator
+        mode_icons = {"voice": "🎙  VOICE MODE", "text": "⌨  TEXT MODE", "both": "🎙  VOICE + TEXT  ⌨"}
+        self.mode_label = QLabel(mode_icons.get(input_mode, "🎙 + ⌨"))
         self.mode_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         mf = QFont("Inter", 8)
         self.mode_label.setFont(mf)
@@ -288,10 +291,20 @@ class KoraDashboard(QMainWindow):
         right_layout.addLayout(input_row)
 
         # Hint label under input
-        hint = QLabel("⌨ type  ·  🎙 speak  ·  both work at the same time")
+        hint_text = {
+            "voice": "🎙 speak to Kora",
+            "text":  "⌨ type and press Enter",
+            "both":  "⌨ type  ·  🎙 speak  ·  both work at the same time",
+        }.get(input_mode, "")
+        hint = QLabel(hint_text)
         hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
         hint.setStyleSheet("color: #1e2535; font-size: 10px; background: transparent;")
         right_layout.addWidget(hint)
+
+        # Hide text input entirely in voice-only mode
+        if input_mode == "voice":
+            self.text_input.hide()
+            self.send_btn.hide()
 
         root.addWidget(right, stretch=1)
 
