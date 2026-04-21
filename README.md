@@ -48,7 +48,7 @@ Unlike basic assistants, Kora is designed with a scalable architecture, making i
 🖥️ GUI-based interaction
 
 # ⚙️ Installation
-'''
+'''bash
 git clone https://github.com/Naman-Dua/Jarvis.git
 cd Jarvis
 pip install -r requirements.txt
