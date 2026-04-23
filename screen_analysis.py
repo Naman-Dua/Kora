@@ -1,10 +1,8 @@
 import os
-import subprocess
 import tempfile
 
+import mss
 import ollama
-
-WINDOWS_POWERSHELL = r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe"
 SCREEN_REQUEST_PHRASES = (
     "what is on my screen",
     "what's on my screen",
@@ -34,32 +32,14 @@ def is_screen_request(text):
     return any(phrase in normalized for phrase in SCREEN_REQUEST_PHRASES)
 
 
-def _run_powershell(script):
-    subprocess.run(
-        [WINDOWS_POWERSHELL, "-NoProfile", "-Command", script],
-        check=True,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-    )
-
 
 def capture_screen():
     with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as temp:
         screenshot_path = temp.name
 
-    escaped_path = screenshot_path.replace("'", "''")
-    script = (
-        "Add-Type -AssemblyName System.Windows.Forms; "
-        "Add-Type -AssemblyName System.Drawing; "
-        "$bounds = [System.Windows.Forms.SystemInformation]::VirtualScreen; "
-        "$bitmap = New-Object System.Drawing.Bitmap $bounds.Width, $bounds.Height; "
-        "$graphics = [System.Drawing.Graphics]::FromImage($bitmap); "
-        "$graphics.CopyFromScreen($bounds.Left, $bounds.Top, 0, 0, $bitmap.Size); "
-        f"$bitmap.Save('{escaped_path}', [System.Drawing.Imaging.ImageFormat]::Png); "
-        "$graphics.Dispose(); "
-        "$bitmap.Dispose();"
-    )
-    _run_powershell(script)
+    with mss.mss() as sct:
+        sct.shot(mon=-1, output=screenshot_path)
+
     return screenshot_path
 
 

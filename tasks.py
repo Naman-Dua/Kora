@@ -3,6 +3,13 @@ import threading
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 
+from storage import (
+    clear_scheduled_items,
+    delete_scheduled_items,
+    load_scheduled_items,
+    save_scheduled_item,
+)
+
 RELATIVE_TIME_PATTERN = re.compile(
     r"\b(?:in|for|after)\s+(\d+)\s*(seconds?|secs?|minutes?|mins?|hours?|hrs?)\b",
     re.IGNORECASE,
@@ -12,11 +19,16 @@ ABSOLUTE_TIME_PATTERN = re.compile(
     re.IGNORECASE,
 )
 LIST_PATTERN = re.compile(r"\b(list|show|what)\b.*\b(reminders|timers)\b", re.IGNORECASE)
-CANCEL_ALL_PATTERN = re.compile(r"\b(cancel|clear|remove|delete)\b.*\b(all )?(reminders|timers)\b", re.IGNORECASE)
+CANCEL_TODAY_PATTERN = re.compile(r"\b(reminders|timers)\b.*\b(today)\b", re.IGNORECASE)
+CANCEL_ALL_PATTERN = re.compile(
+    r"(?:\b(cancel|clear|remove|delete)\b.*\b(all )?(reminders|timers)\b)|(?:\breminders?\s+off\b)",
+    re.IGNORECASE,
+)
 TIMER_PATTERN = re.compile(r"\b(timer)\b", re.IGNORECASE)
 REMINDER_PATTERN = re.compile(r"\b(remind me|set a reminder|reminder)\b", re.IGNORECASE)
 LEADING_CONNECTOR_PATTERN = re.compile(r"^(to|about|that|for)\s+", re.IGNORECASE)
 LEADING_ARTICLE_PATTERN = re.compile(r"^(a|an|the)\s+", re.IGNORECASE)
+EMPTY_REMINDER_TASK_PATTERN = re.compile(r"^(?:set|set up|setup|make|create)\s*$", re.IGNORECASE)
 
 UNIT_SECONDS = {
     "second": 1,
@@ -48,6 +60,8 @@ class ScheduledItem:
     def trigger_message(self):
         if self.kind == "timer":
             return f"Timer complete. {self.task}"
+        if self.task == "something important":
+            return "Reminder time."
         return f"Reminder: {self.task}"
 
 
@@ -56,6 +70,27 @@ class ReminderManager:
         self._lock = threading.Lock()
         self._items = []
         self._next_id = 1
+        self._restore()
+
+    def _restore(self):
+        restored = []
+        max_id = 0
+        for row in load_scheduled_items():
+            try:
+                item = ScheduledItem(
+                    id=int(row["id"]),
+                    kind=row["kind"],
+                    task=row["task"],
+                    due_at=datetime.fromisoformat(row["due_at"]),
+                    created_at=datetime.fromisoformat(row["created_at"]),
+                )
+            except Exception:
+                continue
+            restored.append(item)
+            max_id = max(max_id, item.id)
+
+        self._items = sorted(restored, key=lambda reminder: reminder.due_at)
+        self._next_id = max_id + 1 if max_id else 1
 
     def schedule(self, kind, task, due_at):
         with self._lock:
@@ -68,6 +103,13 @@ class ReminderManager:
             self._next_id += 1
             self._items.append(item)
             self._items.sort(key=lambda reminder: reminder.due_at)
+            save_scheduled_item(
+                item.id,
+                item.kind,
+                item.task,
+                item.due_at.isoformat(),
+                item.created_at.isoformat(),
+            )
             return item
 
     def pop_due(self, now=None):
@@ -75,6 +117,7 @@ class ReminderManager:
         with self._lock:
             due_items = [item for item in self._items if item.due_at <= now]
             self._items = [item for item in self._items if item.due_at > now]
+            delete_scheduled_items(item.id for item in due_items)
             return due_items
 
     def describe(self, now=None):
@@ -96,10 +139,27 @@ class ReminderManager:
                 return "You have no active reminders or timers."
             return "Active reminders: " + "; ".join(phrases) + "."
 
+    def describe_today(self, now=None):
+        now = now or datetime.now()
+        with self._lock:
+            todays_items = [
+                item for item in self._items
+                if item.due_at.date() == now.date() and item.due_at >= now
+            ]
+            if not todays_items:
+                return "You have no reminders or timers left for today."
+
+            phrases = [
+                f"{item.kind} for {item.task} at {item.due_at.strftime('%I:%M %p').lstrip('0')}"
+                for item in todays_items[:5]
+            ]
+            return "For today: " + "; ".join(phrases) + "."
+
     def cancel_all(self):
         with self._lock:
             count = len(self._items)
             self._items.clear()
+            clear_scheduled_items()
             return count
 
 
@@ -108,6 +168,8 @@ def _cleanup_task_text(text):
     cleaned = LEADING_CONNECTOR_PATTERN.sub("", cleaned).strip(" ,.-")
     cleaned = LEADING_ARTICLE_PATTERN.sub("", cleaned).strip(" ,.-")
     cleaned = LEADING_CONNECTOR_PATTERN.sub("", cleaned).strip(" ,.-")
+    if EMPTY_REMINDER_TASK_PATTERN.fullmatch(cleaned):
+        cleaned = ""
     if cleaned.lower() in {"a", "an", "the"}:
         cleaned = ""
     return cleaned or "something important"
@@ -156,15 +218,30 @@ def _parse_absolute_time(text, now):
 def _build_schedule_reply(kind, task, due_at, now):
     if kind == "timer":
         delta = due_at - now
-        total_seconds = int(delta.total_seconds())
-        if total_seconds < 60:
-            span = f"{total_seconds} seconds"
-        elif total_seconds < 3600:
-            span = f"{total_seconds // 60} minutes"
+        total_seconds = max(0, int(delta.total_seconds()))
+        hours, remainder = divmod(total_seconds, 3600)
+        minutes, seconds = divmod(remainder, 60)
+
+        parts = []
+        if hours:
+            parts.append(f"{hours} hour{'s' if hours != 1 else ''}")
+        if minutes:
+            parts.append(f"{minutes} minute{'s' if minutes != 1 else ''}")
+        if seconds and not hours:
+            parts.append(f"{seconds} second{'s' if seconds != 1 else ''}")
+        if not parts:
+            parts.append("0 seconds")
+
+        if len(parts) == 1:
+            span = parts[0]
+        elif len(parts) == 2:
+            span = f"{parts[0]} and {parts[1]}"
         else:
-            span = f"{total_seconds // 3600} hours"
+            span = ", ".join(parts[:-1]) + f", and {parts[-1]}"
         return f"Timer set for {span}. I will alert you at {due_at.strftime('%I:%M %p').lstrip('0')}."
 
+    if task == "something important":
+        return f"Reminder set for {due_at.strftime('%I:%M %p').lstrip('0')}."
     return f"Reminder set for {due_at.strftime('%I:%M %p').lstrip('0')} to {task}."
 
 
@@ -178,9 +255,20 @@ def check_for_tasks(text, reminder_manager, now=None):
     normalized = " ".join(text.lower().strip().split())
 
     if LIST_PATTERN.search(normalized):
+        if CANCEL_TODAY_PATTERN.search(normalized):
+            return {
+                "action": "list_today",
+                "reply": reminder_manager.describe_today(now),
+            }
         return {
             "action": "list",
             "reply": reminder_manager.describe(now),
+        }
+
+    if "today" in normalized and ("reminder" in normalized or "timer" in normalized):
+        return {
+            "action": "list_today",
+            "reply": reminder_manager.describe_today(now),
         }
 
     if CANCEL_ALL_PATTERN.search(normalized):
@@ -227,7 +315,11 @@ def check_for_tasks(text, reminder_manager, now=None):
         cleaned_task = _cleanup_task_text(task_text)
         task = cleaned_task if cleaned_task != "something important" else "Your timer is done."
     else:
-        task_text = re.sub(r"\bset a reminder\b|\bremind me\b|\breminder\b", "", task_text)
+        task_text = re.sub(
+            r"\bset up a reminder\b|\bset up reminder\b|\bset reminder\b|\bset a reminder\b|\bremind me\b|\breminder\b",
+            "",
+            task_text,
+        )
         if matched_time:
             task_text = task_text.replace(matched_time, "")
         task = _cleanup_task_text(task_text)

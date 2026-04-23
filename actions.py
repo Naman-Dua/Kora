@@ -2,6 +2,7 @@ import os
 import re
 import subprocess
 import webbrowser
+from urllib.parse import urlparse
 
 LOCALAPPDATA = os.getenv("LOCALAPPDATA", "")
 PROGRAMFILES = os.getenv("PROGRAMFILES", "")
@@ -107,12 +108,11 @@ WEB_TARGETS = {
     "reddit": ("Reddit", "https://www.reddit.com"),
 }
 
-OPEN_VERBS = ("open", "launch", "start", "run")
-CLOSE_VERBS = ("close", "quit", "stop", "exit")
 ACTION_PATTERNS = {
     "open": re.compile(r"\b(open|launch|start|run)\b"),
     "close": re.compile(r"\b(close|quit|stop|exit)\b"),
 }
+ACTION_CHAIN_SPLIT_PATTERN = re.compile(r"\b(?:and then|then|also)\b", re.IGNORECASE)
 LEADING_FILLER_PATTERN = re.compile(
     r"^(?:hey kora|kora|can you|could you|would you|please|hey|hi|just|for me)\s+",
     re.IGNORECASE,
@@ -126,6 +126,7 @@ TARGET_SUFFIX_PATTERN = re.compile(
     r"\s+(?:app|application|program|window)\s*$",
     re.IGNORECASE,
 )
+URL_PATTERN = re.compile(r"^(?:https?://|www\.)", re.IGNORECASE)
 
 
 def _normalize(text):
@@ -150,19 +151,44 @@ def _extract_action_target(command_text):
     return None, None
 
 
+def _split_action_segments(command_text):
+    normalized = _normalize(command_text)
+    if not normalized:
+        return []
+
+    raw_segments = [segment.strip(" ,") for segment in ACTION_CHAIN_SPLIT_PATTERN.split(normalized) if segment.strip(" ,")]
+    if len(raw_segments) <= 1:
+        return raw_segments
+
+    rebuilt = []
+    current_action = None
+    for segment in raw_segments:
+        action, _ = _extract_action_target(segment)
+        if action:
+            current_action = action
+            rebuilt.append(segment)
+            continue
+        if current_action:
+            rebuilt.append(f"{current_action} {segment}")
+        else:
+            rebuilt.append(segment)
+    return rebuilt
+
+
 def _resolve_app(target_text):
-    best_match = None
+    best_key = None
+    best_app = None
     best_length = -1
 
-    for app in APP_TARGETS.values():
+    for app_key, app in APP_TARGETS.items():
         for alias in app["aliases"]:
             alias_pattern = rf"(^|\b){re.escape(alias)}(\b|$)"
-            if re.search(alias_pattern, target_text):
-                if len(alias) > best_length:
-                    best_match = app
-                    best_length = len(alias)
+            if re.search(alias_pattern, target_text) and len(alias) > best_length:
+                best_key = app_key
+                best_app = app
+                best_length = len(alias)
 
-    return best_match
+    return best_key, best_app
 
 
 def _resolve_web(target_text):
@@ -171,12 +197,19 @@ def _resolve_web(target_text):
 
     for alias, details in WEB_TARGETS.items():
         alias_pattern = rf"(^|\b){re.escape(alias)}(\b|$)"
-        if re.search(alias_pattern, target_text):
-            if len(alias) > best_length:
-                best_match = details
-                best_length = len(alias)
+        if re.search(alias_pattern, target_text) and len(alias) > best_length:
+            best_match = details
+            best_length = len(alias)
 
     return best_match
+
+
+def _resolve_direct_url(target_text):
+    if not URL_PATTERN.match(target_text):
+        return None
+    url = target_text if target_text.startswith(("http://", "https://")) else f"https://{target_text}"
+    label = urlparse(url).netloc or url
+    return label, url
 
 
 def _launch_app(app):
@@ -207,31 +240,106 @@ def _close_app(app):
     return False
 
 
-def perform_action(cmd):
-    """Handle direct desktop open/close commands before routing to the LLM."""
-    command_text = _normalize(cmd)
-    action, target_text = _extract_action_target(command_text)
-    if not action or not target_text:
+def plan_action_command(command_text):
+    """Parse an action command into executable requests."""
+    requests = []
+    for segment in _split_action_segments(command_text):
+        action, target_text = _extract_action_target(segment)
+        if not action or not target_text:
+            continue
+
+        direct_url = _resolve_direct_url(target_text)
+        if action == "open" and direct_url:
+            label, url = direct_url
+            requests.append(
+                {
+                    "kind": "web",
+                    "action": "open",
+                    "label": label,
+                    "url": url,
+                    "risky": False,
+                }
+            )
+            continue
+
+        web_target = _resolve_web(target_text)
+        if action == "open" and web_target:
+            label, url = web_target
+            requests.append(
+                {
+                    "kind": "web",
+                    "action": "open",
+                    "label": label,
+                    "url": url,
+                    "risky": False,
+                }
+            )
+            continue
+
+        app_key, app = _resolve_app(target_text)
+        if not app:
+            continue
+
+        requests.append(
+            {
+                "kind": "app",
+                "action": action,
+                "app_key": app_key,
+                "label": app["close_name"],
+                "risky": action == "close",
+            }
+        )
+
+    if not requests:
         return None
 
-    web_target = _resolve_web(target_text)
-    if action == "open" and web_target:
-        label, url = web_target
-        webbrowser.open(url)
-        return f"Opening {label}."
+    summary_parts = []
+    for request in requests:
+        verb = "open" if request["action"] == "open" else "close"
+        summary_parts.append(f"{verb} {request['label']}")
 
-    app = _resolve_app(target_text)
-    if not app:
+    return {
+        "requests": requests,
+        "requires_confirmation": any(request["risky"] for request in requests),
+        "summary": ", then ".join(summary_parts),
+    }
+
+
+def execute_action_plan(plan):
+    """Run a planned action and return a spoken/loggable summary."""
+    replies = []
+    for request in plan["requests"]:
+        if request["kind"] == "web":
+            webbrowser.open(request["url"])
+            replies.append(f"Opening {request['label']}.")
+            continue
+
+        app = APP_TARGETS[request["app_key"]]
+        if request["action"] == "open":
+            if _launch_app(app):
+                replies.append(app["reply"])
+            else:
+                replies.append(
+                    f"I recognized {app['close_name']}, but I could not launch it on this PC."
+                )
+            continue
+
+        close_result = _close_app(app)
+        if close_result == "unsupported":
+            replies.append(
+                f"I can open {app['close_name']}, but closing it is not wired up yet."
+            )
+        elif close_result:
+            replies.append(f"Closed {app['close_name']}.")
+        else:
+            replies.append(f"I could not find {app['close_name']} running right now.")
+
+    return " ".join(replies)
+
+
+def perform_action(command_text):
+    """Backward-compatible wrapper for immediate action execution."""
+    plan = plan_action_command(command_text)
+    if not plan:
         return None
-
-    if action == "open":
-        if _launch_app(app):
-            return app["reply"]
-        return f"I recognized {app['close_name']}, but I could not launch it on this PC."
-
-    close_result = _close_app(app)
-    if close_result == "unsupported":
-        return f"I can open {app['close_name']}, but closing it is not wired up yet."
-    if close_result:
-        return f"Closed {app['close_name']}."
-    return f"I could not find {app['close_name']} running right now."
+    return execute_action_plan(plan)

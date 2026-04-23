@@ -2,6 +2,7 @@ import sys
 import os
 import math
 import random
+from html import escape
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QGraphicsDropShadowEffect, QTextEdit,
@@ -139,6 +140,8 @@ class KoraDashboard(QMainWindow):
     status_signal      = pyqtSignal(str)
     log_signal         = pyqtSignal(str, str)
     text_input_signal  = pyqtSignal(str)
+    telemetry_signal   = pyqtSignal(dict)
+    re_enable_input_signal = pyqtSignal()
 
     LOG_COLORS = {
         "USER":         "#ffffff",
@@ -301,6 +304,32 @@ class KoraDashboard(QMainWindow):
         hint.setStyleSheet("color: #1e2535; font-size: 10px; background: transparent;")
         right_layout.addWidget(hint)
 
+        # Telemetry strip (persistent usage health indicators)
+        telemetry_wrap = QFrame()
+        telemetry_wrap.setStyleSheet("""
+            QFrame {
+                background-color: #0a0e15;
+                border: 1px solid #151b28;
+                border-radius: 8px;
+            }
+        """)
+        telemetry_layout = QHBoxLayout(telemetry_wrap)
+        telemetry_layout.setContentsMargins(10, 6, 10, 6)
+        telemetry_layout.setSpacing(14)
+        self.metric_commands = QLabel("Commands: 0")
+        self.metric_events = QLabel("Events: 0")
+        self.metric_errors = QLabel("Errors: 0")
+        self.metric_last = QLabel("Last event: -")
+        for widget in (
+            self.metric_commands,
+            self.metric_events,
+            self.metric_errors,
+            self.metric_last,
+        ):
+            widget.setStyleSheet("color: #5d6b86; font-size: 10px;")
+            telemetry_layout.addWidget(widget)
+        right_layout.addWidget(telemetry_wrap)
+
         # Hide text input entirely in voice-only mode
         if input_mode == "voice":
             self.text_input.hide()
@@ -311,9 +340,12 @@ class KoraDashboard(QMainWindow):
         # Connect signals
         self.status_signal.connect(self.update_status)
         self.log_signal.connect(self.append_log)
+        self.telemetry_signal.connect(self.update_telemetry)
+        self.re_enable_input_signal.connect(self._re_enable_input_on_main_thread)
 
         # Load past conversation from DB
         self._load_past_logs()
+        self._load_telemetry_snapshot()
 
     # ── Internal: submit typed text ───────────────────────────────────────────
 
@@ -327,6 +359,10 @@ class KoraDashboard(QMainWindow):
         self.text_input_signal.emit(text) # Send to main.py logic thread
 
     def re_enable_input(self):
+        """Schedule the input controls to update on the GUI thread."""
+        self.re_enable_input_signal.emit()
+
+    def _re_enable_input_on_main_thread(self):
         """Re-enable the send button after Kora has replied."""
         self.send_btn.setEnabled(True)
         self.text_input.setFocus()
@@ -347,9 +383,11 @@ class KoraDashboard(QMainWindow):
         display = message
         if message.startswith("[Relevant memory:") and "\n\nUser says:" in message:
             display = message.split("\n\nUser says:", 1)[1].strip()
+        safe_sender = escape(str(sender).upper())
+        safe_display = escape(str(display))
         self.log_view.append(
-            f'<span style="color:{color};font-weight:600;">{sender.upper()}:</span>'
-            f'&nbsp;<span style="color:#c8cdd6;">{display}</span>'
+            f'<span style="color:{color};font-weight:600;">{safe_sender}:</span>'
+            f'&nbsp;<span style="color:#c8cdd6;">{safe_display}</span>'
         )
         self.log_view.moveCursor(QTextCursor.MoveOperation.End)
 
@@ -370,10 +408,12 @@ class KoraDashboard(QMainWindow):
                     display = content.split("\n\nUser says:", 1)[1].strip()
                 color = self.LOG_COLORS.get(role.upper(), "#888")
                 ts    = str(timestamp)[:16]
+                safe_role = escape(str(role).upper())
+                safe_display = escape(str(display))
                 self.log_view.append(
                     f'<span style="color:#1e2535;">[{ts}]</span> '
-                    f'<span style="color:{color};font-weight:600;">{role.upper()}:</span>'
-                    f'&nbsp;<span style="color:#9098a8;">{display}</span>'
+                    f'<span style="color:{color};font-weight:600;">{safe_role}:</span>'
+                    f'&nbsp;<span style="color:#9098a8;">{safe_display}</span>'
                 )
             self.log_view.append(
                 '<span style="color:#1a2030;font-size:11px;">─── new session ───</span>'
@@ -381,6 +421,21 @@ class KoraDashboard(QMainWindow):
             self.log_view.moveCursor(QTextCursor.MoveOperation.End)
         except Exception as e:
             print(f"[GUI] Could not load past logs: {e}")
+
+    def _load_telemetry_snapshot(self):
+        try:
+            from storage import load_telemetry_summary
+            self.update_telemetry(load_telemetry_summary())
+        except Exception as e:
+            print(f"[GUI] Could not load telemetry summary: {e}")
+
+    def update_telemetry(self, summary):
+        if not isinstance(summary, dict):
+            return
+        self.metric_commands.setText(f"Commands: {summary.get('total_commands', 0)}")
+        self.metric_events.setText(f"Events: {summary.get('total_events', 0)}")
+        self.metric_errors.setText(f"Errors: {summary.get('total_errors', 0)}")
+        self.metric_last.setText(f"Last event: {summary.get('last_event') or '-'}")
 
     # ── Keyboard shortcuts ────────────────────────────────────────────────────
 
