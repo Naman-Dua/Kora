@@ -33,16 +33,18 @@ Output JSON list ONLY:
         response = ollama.generate(model=model_name, prompt=prompt)
         content = response['response'].strip()
         
-        # Try to parse the JSON output
-        # Sometimes the LLM might add markdown formatting like ```json ... ```
-        if "```json" in content:
-            content = content.split("```json")[1].split("```")[0].strip()
-        elif "```" in content:
-            content = content.split("```")[1].split("```")[0].strip()
-            
-        facts = json.loads(content)
-        if isinstance(facts, list):
-            return facts
+        # Robust JSON extraction: Find the first '[' and the last ']'
+        import re
+        match = re.search(r'\[.*\]', content, re.DOTALL)
+        if match:
+            json_str = match.group(0)
+            try:
+                facts = json.loads(json_str)
+                if isinstance(facts, list):
+                    return [str(f) for f in facts]
+            except json.JSONDecodeError:
+                pass
+        
         return []
     except Exception as e:
         print(f"[LLM Memory Extractor Error] {e}")

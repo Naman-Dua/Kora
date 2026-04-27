@@ -1,0 +1,24 @@
+# Core UI and Logic
+PyQt6
+ollama
+requests
+chromadb
+sqlite3
+
+# Voice and Audio
+SpeechRecognition
+PyAudio
+pyttsx3
+edge-tts
+
+# Automation and OS Control
+pyautogui
+psutil
+Pillow
+pywin32
+
+# Media and Hardware
+winsound
+
+# Vision
+moondream

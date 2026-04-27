@@ -7,7 +7,11 @@ from kora_operator import handle_operator_command, OperatorState
 from settings import get_setting
 
 class TelegramBridge:
+<<<<<<< HEAD
     def __init__(self, ui_log_callback, speak_callback):
+=======
+    def __init__(self, ui_log_callback, speak_callback, operator_state):
+>>>>>>> main
         self.token = get_setting("telegram_token", "")
         self.chat_id = get_setting("telegram_chat_id", "") # Authorized chat ID
         self.base_url = f"https://api.telegram.org/bot{self.token}"
@@ -15,7 +19,11 @@ class TelegramBridge:
         self.speak = speak_callback
         self.last_update_id = 0
         self.running = False
+<<<<<<< HEAD
         self.operator_state = OperatorState()
+=======
+        self.operator_state = operator_state
+>>>>>>> main
 
     def send_message(self, text):
         if not self.token or not self.chat_id: return

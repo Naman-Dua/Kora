@@ -1,101 +1,93 @@
-# Kora - AI Desktop Assistant
+# 💠 Kora: The Autonomous AI Assistant
 
-<p align="center">
-  <img src="https://img.shields.io/badge/Python-3.10%2B-blue?style=for-the-badge&logo=python" alt="Python 3.10+">
-  <img src="https://img.shields.io/badge/AI-Desktop%20Assistant-black?style=for-the-badge" alt="AI Assistant">
-  <img src="https://img.shields.io/badge/Voice-Controlled-success?style=for-the-badge" alt="Voice Controlled">
-</p>
+Kora (Jarvis 2.0) is a next-generation, local-first AI assistant designed for Windows. She combines a stunning 3D glassmorphic dashboard with autonomous agency, self-healing capabilities, and a proactive vision system.
 
-Kora is a modular desktop assistant built with Python. It combines voice input, command routing, automation, memory, and a GUI to provide a practical base for building advanced assistant workflows.
+---
 
-## Features
+## 🌟 Core Features
 
-- Voice command capture and transcription
-- Command routing through a centralized brain module
-- Desktop action execution (apps/web tasks)
-- Reminder and scheduling workflows
-- Screen capture and analysis support
-- Persistent memory with SQLite
-- PyQt-based interactive dashboard
+### 🧠 1. Neural Intelligence (Local LLM)
 
-## Architecture
+- **Brain**: Powered by **Llama 3.1:8b** via Ollama. 100% private and offline.
+- **Emotional Synchrony**: The 3D dashboard reacts to the conversation's sentiment (Calm Blue, Energetic Orange, Warning Red, Positive Pink).
+- **Fact Extraction**: Kora autonomously "overhears" and remembers facts about you (names, likes, goals) without manual input.
 
-| Module | Purpose |
-| --- | --- |
-| `main.py` | Application entry point and runtime orchestration |
-| `brain.py` | Decision-making and conversation handling |
-| `ears.py` | Voice capture and speech-to-text pipeline |
-| `voice.py` | Text-to-speech output |
-| `actions.py` | System and browser action execution |
-| `tasks.py` | Reminder/task parsing and scheduling |
-| `mode_select.py` | Runtime mode selection dialog |
-| `search_engine.py` | Web lookup and information retrieval |
-| `screen_analysis.py` | Screen capture and vision-style analysis |
-| `storage.py` | SQLite persistence and memory management |
-| `gui.py` | Desktop interface and visualization |
+### 👁️ 2. Live Eye (Proactive Vision)
 
-## Project Flow
+- **Model**: Uses **Moondream** to analyze your screen.
+- **Proactivity**: She monitors your screen for errors, interesting news, or stalled tasks and proactively offers help or summaries.
 
-<img width="1411" height="1337" alt="Kora architecture flow" src="https://github.com/user-attachments/assets/f126f5c1-e4cf-480e-8d36-44f51d96402e" />
+### 📅 3. Digital Life Manager
 
-## Quick Start
+- **Autonomous Scheduling**: Mention an appointment in chat, and she will automatically queue a reminder.
+- **Morning Briefing**: A single command (`"Start my day"`) generates a synthesized report of weather, news, todos, and your schedule.
 
-### 1) Clone the repository
+### 🛠️ 4. The Plugin Architect (Self-Evolution)
+
+- **Autonomous Coding**: Tell Kora to "create a plugin for X," and she will write the Python code, save it, and register the new skill instantly.
+- **Full OS Control**: Native modules for File management, Window control, Media (Spotify/Volume), and Clipboard.
+
+### 📱 5. Telegram / Mobile Bridge
+
+- **Remote Control**: Control your PC from anywhere in the world via Telegram.
+- **Remote Vision**: Ask for a screenshot on your phone to see what's happening on your desktop.
+
+---
+
+## 🚀 Setup & Installation
+
+### 1. Prerequisites
+
+Download and install the following:
+
+- **Python 3.10+**
+- **Ollama**: [Download from ollama.com](https://ollama.com)
+
+### 2. Download Models
+
+Run these commands in your terminal to pull the necessary intelligence:
 
 ```bash
-git clone https://github.com/Naman-Dua/Jarvis.git
-cd Jarvis
+ollama pull llama3.1:8b   # Core Brain
+ollama pull moondream     # Vision System
 ```
 
-### 2) Install dependencies
+### 3. Install Dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 3) Run Kora
+### 4. Configuration
 
-```bash
-python main.py
-```
+Edit `settings.json` (or use voice commands) to configure:
 
-## Requirements
+- `telegram_token`: Your BotFather token for mobile control.
+- `telegram_chat_id`: Your personal Telegram ID for security.
 
-- Python 3.10+
-- Working microphone input
-- Internet connection for features that depend on web/model calls
+---
 
-## Configuration
+## 🎙️ Command Guide
 
-- Store API keys and environment-specific settings in a `.env` file.
-- Keep secrets out of source control.
+| Category      | Voice/Text Command Examples                                            |
+| :------------ | :--------------------------------------------------------------------- |
+| **System**    | "Shutdown", "Go to sleep", "Recalibrate mic"                           |
+| **Daily**     | "Give me my morning briefing", "What's on my schedule?"                |
+| **Action**    | "Open Chrome", "Close Notepad", "Search for 'Deep Learning'"           |
+| **Memory**    | "Forget everything", "What do you know about me?"                      |
+| **Evolution** | "Create a plugin for crypto prices", "Build a skill for science facts" |
+| **Remote**    | (Via Telegram) "Take a screenshot", "Is my PC running?"                |
 
-## Roadmap
+---
 
-- Deeper LLM integration for richer responses
-- Improved context-aware long-term memory
-- Browser automation extensions
-- Remote/mobile control support
-- Enhanced UI/UX and telemetry
+## 🛡️ Self-Healing
 
-## Contributing
+If a command fails (e.g., an app isn't where it used to be), Kora's **Self-Healing Module** will analyze the error, search for the correct path, and offer a fix automatically.
 
-Contributions are welcome. If you want to improve Kora:
+---
 
-1. Fork the repository
-2. Create a feature branch
-3. Commit your changes
-4. Open a pull request
+## 🎨 UI Aesthetics
 
-## Author
+The dashboard uses hardware-accelerated 3D rendering (PyQt6 + OpenGL) to create a premium, glassmorphic sphere that vibrates and ripples in sync with Kora's voice.
 
-Naman Dua  
-GitHub: [Naman-Dua](https://github.com/Naman-Dua)
-
-## Support
-
-If this project helps you, please consider:
-
-- Starring the repository
-- Forking it
-- Sharing it with others
+**Developed with ❤️ by Naman Dua**

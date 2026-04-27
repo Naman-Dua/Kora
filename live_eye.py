@@ -6,11 +6,10 @@ from screen_analysis import capture_screen, get_available_vision_model
 from settings import get_setting
 
 class LiveEye(threading.Thread):
-    def __init__(self, ui_log_callback, speak_callback, command_queue=None):
+    def __init__(self, ui_log_callback, speak_callback):
         super().__init__(daemon=True)
         self.ui_log = ui_log_callback
         self.speak = speak_callback
-        self.command_queue = command_queue
         self.running = False
         self.interval = 45 # Slightly faster for proactivity
         self.last_observation = ""
@@ -60,19 +59,8 @@ If everything is CLEAR or normal, output: CLEAR
             observation = response["message"]["content"].strip()
             
             if observation.upper() != "CLEAR" and observation != self.last_observation:
-                # Extract parts
-                parts = observation.split("\n")
-                summary = observation
-                for p in parts:
-                    if p.startswith("PROPOSAL:"):
-                        summary = p.replace("PROPOSAL:", "").strip()
-                    if p.startswith("COMMAND:") and self.command_queue:
-                        # Optional: We could automatically queue it if highly confident, 
-                        # but for now we just log it as a suggestion.
-                        pass
-
-                self.ui_log("KORA (PROACTIVE)", summary)
-                self.speak(f"I noticed something. {summary}")
+                self.ui_log("KORA (PROACTIVE)", observation)
+                self.speak(observation)
                 self.last_observation = observation
                 
         except Exception as e:

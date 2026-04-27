@@ -55,9 +55,12 @@ class KoraBrain:
                 *self.conversation_history[:-1],
                 {"role": "user", "content": current_user_prompt}
             ]
-            
-            # 1. Generate Reply
-            response = ollama.chat(model=self.model_name, messages=llm_messages)
+
+            response = ollama.chat(
+                model=self.model_name,
+                messages=llm_messages,
+            )
+
             reply = response["message"]["content"].strip()
             
             # 2. Analyze Sentiment & Proactive Intent (Fast secondary check)
