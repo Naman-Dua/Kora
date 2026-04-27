@@ -1,11 +1,67 @@
-/__pycache__
-/__pycache__
-/kora_chroma_db
-/plugins
-/exports
-/__pycache__
-__pycache__/task_memory.cpython-314.pyc
-/__pycache__
-/__pycache__
-/__pycache__
-kora_memory.db
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / build
+bin/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+#  Usually these files are written by a python script, before PyInstaller builds the exe, 
+#  so as to inject date/other infos into it.
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+cover/
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# SQLite databases (local memory)
+*.sqlite
+*.db
+
+# Audio temp files
+temp_audio.wav
+
+# Local settings
+settings.json
