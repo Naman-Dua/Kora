@@ -52,7 +52,7 @@ def handle_file_command(text):
                 pass
             return {"action": "file_create", "reply": f"Created file: {path}"}
         except Exception as e:
-            return {"action": "file_create", "reply": f"Could not create file: {e}"}
+            return {"action": "file_create", "reply": f"Could not create file: {e}", "success": False, "error": str(e)}
 
     # Write content (Internal/Direct)
     m = re.match(r"^write (?:text |content )?\"(.+?)\" to (?:the )?file (.+)$", normalized, re.I)
@@ -60,8 +60,8 @@ def handle_file_command(text):
         content = m.group(1)
         path = m.group(2)
         if write_to_file(path, content):
-            return {"action": "file_write", "reply": f"Written content to {path}"}
-        return {"action": "file_write", "reply": f"Failed to write to {path}"}
+            return {"action": "file_write", "reply": f"Written content to {path}", "success": True}
+        return {"action": "file_write", "reply": f"Failed to write to {path}", "success": False, "error": "Unknown write error"}
 
     # Delete
     m = re.match(r"^(?:delete|remove) (?:the )?file (.+)$", normalized, re.I)
@@ -76,7 +76,7 @@ def handle_file_command(text):
                 os.remove(path)
             return {"action": "file_delete", "reply": f"Deleted: {path}"}
         except Exception as e:
-            return {"action": "file_delete", "reply": f"Could not delete: {e}"}
+            return {"action": "file_delete", "reply": f"Could not delete: {e}", "success": False, "error": str(e)}
 
     # Move
     m = re.match(r"^move (?:the )?file (.+?) to (.+)$", normalized, re.I)
@@ -87,7 +87,7 @@ def handle_file_command(text):
             shutil.move(src, dst)
             return {"action": "file_move", "reply": f"Moved {src} to {dst}"}
         except Exception as e:
-            return {"action": "file_move", "reply": f"Could not move: {e}"}
+            return {"action": "file_move", "reply": f"Could not move: {e}", "success": False, "error": str(e)}
 
     # Rename
     m = re.match(r"^rename (?:the )?file (.+?) to (.+)$", normalized, re.I)
@@ -98,7 +98,7 @@ def handle_file_command(text):
             os.rename(src, dst)
             return {"action": "file_rename", "reply": f"Renamed to {dst}"}
         except Exception as e:
-            return {"action": "file_rename", "reply": f"Could not rename: {e}"}
+            return {"action": "file_rename", "reply": f"Could not rename: {e}", "success": False, "error": str(e)}
 
     # List
     m = re.match(r"^(?:list files (?:in )?|(?:show|what(?:'s| is) in) (?:the )?folder )(.+)$", normalized, re.I)

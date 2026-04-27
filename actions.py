@@ -213,16 +213,19 @@ def _resolve_direct_url(target_text):
 
 
 def _launch_app(app):
-    for path in app.get("paths", []):
-        if path and os.path.exists(path):
-            os.startfile(path)
-            return True
+    try:
+        for path in app.get("paths", []):
+            if path and os.path.exists(path):
+                os.startfile(path)
+                return True, None
 
-    command = app.get("command") or app.get("fallback")
-    if command:
-        subprocess.Popen(command)
-        return True
-    return False
+        command = app.get("command") or app.get("fallback")
+        if command:
+            subprocess.Popen(command)
+            return True, None
+        return False, "No valid path or command found for this application."
+    except Exception as e:
+        return False, str(e)
 
 
 def _close_app(app):
@@ -306,21 +309,29 @@ def plan_action_command(command_text):
 
 
 def execute_action_plan(plan):
-    """Run a planned action and return a spoken/loggable summary."""
+    """Run a planned action and return a result dict."""
     replies = []
+    failures = []
+    
     for request in plan["requests"]:
         if request["kind"] == "web":
-            webbrowser.open(request["url"])
-            replies.append(f"Opening {request['label']}.")
+            try:
+                webbrowser.open(request["url"])
+                replies.append(f"Opening {request['label']}.")
+            except Exception as e:
+                failures.append({"request": request, "error": str(e)})
+                replies.append(f"Failed to open {request['label']} in browser.")
             continue
 
         app = APP_TARGETS[request["app_key"]]
         if request["action"] == "open":
-            if _launch_app(app):
+            success, error = _launch_app(app)
+            if success:
                 replies.append(app["reply"])
             else:
+                failures.append({"request": request, "error": error or "Launch failed"})
                 replies.append(
-                    f"I recognized {app['close_name']}, but I could not launch it on this PC."
+                    f"I recognized {app['close_name']}, but I could not launch it: {error}."
                 )
             continue
 
@@ -332,9 +343,14 @@ def execute_action_plan(plan):
         elif close_result:
             replies.append(f"Closed {app['close_name']}.")
         else:
+            failures.append({"request": request, "error": "Process not found or taskkill failed"})
             replies.append(f"I could not find {app['close_name']} running right now.")
 
-    return " ".join(replies)
+    return {
+        "reply": " ".join(replies),
+        "success": len(failures) == 0,
+        "failures": failures
+    }
 
 
 def perform_action(command_text):

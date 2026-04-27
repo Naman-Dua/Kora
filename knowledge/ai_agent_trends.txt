@@ -1,0 +1,13 @@
+# The Future of Agentic AI (2024-2025)
+
+## The Shift to Autonomy
+The AI field is moving from "Chatbots" to "Agents." Agents are defined by their ability to:
+- **Reason**: Plan multi-step actions.
+- **Act**: Use tools (web search, code execution, file management).
+- **Self-Correct**: Recognize when a step fails and try a different approach.
+
+## Key Trends
+1. **Small Language Models (SLMs)**: Models like Llama 3.2 (1B/3B) and Phi-3 are becoming capable enough for local desktop orchestration.
+2. **Multimodal Awareness**: Vision-language models (VLMs) allow agents to "see" the user's workspace, enabling UI automation.
+3. **Long-Term Context**: Vector databases (RAG) allow agents to maintain a "personal history" of the user's data.
+4. **Local-First AI**: Privacy-focused users are moving toward local execution (Ollama, LM Studio) to ensure their data never leaves their machine.

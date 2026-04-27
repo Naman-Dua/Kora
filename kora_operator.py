@@ -36,6 +36,7 @@ from web_monitor import handle_web_monitor_command, is_web_monitor_request
 from window_mgmt import handle_window_command, is_window_request
 from plugin_architect import handle_architect_command, is_architect_request
 from mission_control import MissionControl
+from self_healing import handle_self_healing
 
 APPROVE_PATTERN = re.compile(r"^(?:approve|confirm|yes|do it|go ahead|proceed)$", re.IGNORECASE)
 REJECT_PATTERN = re.compile(r"^(?:reject|cancel that|no|never mind|dont do that|don't do that)$", re.IGNORECASE)
@@ -78,13 +79,18 @@ def _set_last_workflow(state, workflow):
     state.last_workflow = copy.deepcopy(workflow)
 
 
-def _execute_workflow(workflow, state, settings):
+def _execute_workflow(workflow, state, settings, query=""):
     workflow_type = workflow["type"]
     payload = workflow["payload"]
 
     if workflow_type == "action_plan":
         _set_last_workflow(state, workflow)
-        return execute_action_plan(payload)
+        res = execute_action_plan(payload)
+        reply = res["reply"]
+        if not res["success"] and res["failures"]:
+            healing_reply = handle_self_healing(res["failures"], query, type('obj', (object,), {'model_name': settings.get('model_name', 'llama3.1:8b')}))
+            reply = f"{reply} {healing_reply}"
+        return reply
 
     if workflow_type == "search":
         _set_last_workflow(state, workflow)
@@ -109,6 +115,24 @@ def _queue_workflow_for_approval(workflow, state):
     state.pending_approval = copy.deepcopy(workflow)
 
 
+def _process_operator_result(result, query, settings):
+    """
+    Checks if a result failed and tries to attach a self-healing suggestion.
+    """
+    if not result or not isinstance(result, dict):
+        return result
+        
+    if result.get("success") is False:
+        failure_info = {
+            "request": {"kind": result.get("action", "unknown"), "action": "execute", "label": "command"},
+            "error": result.get("error", "Unknown error")
+        }
+        healing_reply = handle_self_healing([failure_info], query, type('obj', (object,), {'model_name': settings.get('model_name', 'llama3.1:8b')}))
+        result["reply"] = f"{result['reply']} {healing_reply}"
+        
+    return result
+
+
 def _automation_summary(items):
     if not items:
         return "There are no saved automations yet."
@@ -123,7 +147,7 @@ def _handle_approval(query, state, settings):
     if APPROVE_PATTERN.match(normalized):
         workflow = state.pending_approval
         state.pending_approval = None
-        reply = _execute_workflow(workflow, state, settings)
+        reply = _execute_workflow(workflow, state, settings, query=state.last_query or query)
         if workflow.get("automation_name"):
             mark_automation_ran(workflow["automation_name"])
         return {"action": "approved", "reply": reply}
@@ -196,6 +220,7 @@ def _handle_contextual_repeat(query, state, settings):
 
 
 def handle_operator_command(query, settings, state, reminder_manager=None):
+    state.last_query = query
     approval_reply = _handle_approval(query, state, settings)
     if approval_reply:
         return approval_reply
@@ -259,13 +284,13 @@ def handle_operator_command(query, settings, state, reminder_manager=None):
 
     # Clipboard
     if is_clipboard_request(query):
-        result = handle_clipboard_command(query)
+        result = _process_operator_result(handle_clipboard_command(query), query, settings)
         if result:
             return result
 
     # File operations
     if is_file_request(query):
-        result = handle_file_command(query)
+        result = _process_operator_result(handle_file_command(query), query, settings)
         if result:
             return result
 
@@ -349,7 +374,7 @@ def handle_operator_command(query, settings, state, reminder_manager=None):
 
     # Process management
     if is_process_request(query):
-        result = handle_process_command(query)
+        result = _process_operator_result(handle_process_command(query), query, settings)
         if result:
             return result
 
@@ -425,7 +450,7 @@ def handle_operator_command(query, settings, state, reminder_manager=None):
             }
         return {
             "action": "action_plan",
-            "reply": _execute_workflow(workflow, state, settings),
+            "reply": _execute_workflow(workflow, state, settings, query=query),
         }
 
     return None

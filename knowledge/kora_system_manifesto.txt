@@ -1,0 +1,20 @@
+# Kora AI Assistant: System Manifesto
+
+## Overview
+Kora is a highly capable, autonomous AI assistant designed for desktop orchestration, research, and proactive assistance. She is built on a modular Python architecture using a combination of local LLMs (via Ollama), computer vision, and semantic memory.
+
+## Core Capabilities
+1. **Desktop Orchestration**: Opening/closing apps, managing windows, and system monitoring.
+2. **Mission Mode (Advanced Planning)**: Kora can take complex, multi-step requests and break them down into a logical execution plan (Search -> Scrape -> Summarize -> Write File).
+3. **Dynamic Plugin Architect**: Kora can write her own Python plugins to extend her capabilities.
+4. **Live Eye (Proactive Vision)**: A background service that monitors the screen to offer real-time help.
+5. **The Infinite Brain (RAG)**: A semantic knowledge base (ChromaDB) that automatically ingests documents from the 'knowledge/' folder.
+6. **Task & Memory Management**: Long-term memory of past conversations and active task tracking.
+
+## Technical Stack
+- **Language**: Python 3.10+
+- **Brain**: Ollama (Llama 3.1, Llama 3.2-Vision, Moondream)
+- **GUI**: PyQt6
+- **Database**: SQLite (for telemetry/logs) and ChromaDB (for vector search)
+- **Vision**: MSS (screen capture) and Ollama Vision models
+- **Audio**: Custom TTS (Azure/Neural) and STT (Ears module)

@@ -35,7 +35,7 @@ def kill_process_by_name(name):
             pass
     
     if count > 0:
-        return f"Successfully terminated {count} instance(s) of {name}."
+        return {"action": "process_kill", "reply": f"Successfully terminated {count} instance(s) of {name}.", "success": True}
     else:
         # Try a partial match if no exact match found
         for proc in psutil.process_iter(['name']):
@@ -46,9 +46,9 @@ def kill_process_by_name(name):
             except (psutil.NoSuchProcess, psutil.AccessDenied):
                 pass
         if count > 0:
-            return f"Successfully terminated {count} instance(s) matching '{name}'."
+            return {"action": "process_kill", "reply": f"Successfully terminated {count} instance(s) matching '{name}'.", "success": True}
             
-    return f"I couldn't find any running process named '{name}'."
+    return {"action": "process_kill", "reply": f"I couldn't find any running process named '{name}'.", "success": False, "error": "Process not found"}
 
 def is_process_request(text):
     patterns = [
