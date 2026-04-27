@@ -2,7 +2,7 @@ import os
 import datetime
 from weather import handle_weather_command
 from news_feed import handle_news_command
-from storage import load_all_reminders
+from storage import load_scheduled_items
 from brain import KoraBrain
 
 def generate_morning_briefing():
@@ -17,12 +17,13 @@ def generate_morning_briefing():
     news_text = news.get("reply", "News data unavailable.")
 
     # 3. Schedule
-    reminders = load_all_reminders()
-    today = datetime.date.today()
-    todays_tasks = [r for r in reminders if r.get("date") == str(today)]
+    items = load_scheduled_items()
+    today_str = datetime.date.today().isoformat()
+    todays_tasks = [i for i in items if i.get("due_at", "").startswith(today_str)]
+    
     schedule_text = "No meetings scheduled for today."
     if todays_tasks:
-        schedule_text = "Your schedule for today: " + "; ".join([f"{t['task']} at {t['time']}" for t in todays_tasks])
+        schedule_text = "Your schedule for today: " + "; ".join([f"{t['task']} at {t['due_at']}" for t in todays_tasks])
 
     # 4. Todo List (from notes.txt)
     todo_text = "Your todo list is empty."
