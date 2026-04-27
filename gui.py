@@ -36,6 +36,13 @@ class KoraSphereWidget(QWidget):
         self.rot_y  = 0.0
         self.state  = "IDLE"
         self.vibration = 0.0
+        
+        # Sentiment-based colors
+        theme = get_active_theme()
+        self.base_color = QColor(theme["accent"])
+        self.current_color = QColor(self.base_color)
+        self.target_color = QColor(self.base_color)
+        self.color_lerp = 1.0 # 0.0 to 1.0 transition
 
         self.particles = []
         n   = 1500  # More particles for premium feel
@@ -69,7 +76,33 @@ class KoraSphereWidget(QWidget):
 
         self.rot_y -= speed_y
         self.rot_x += speed_x
+        
+        # Color lerping
+        if self.color_lerp < 1.0:
+            self.color_lerp += 0.02
+            r = int(self.current_color.red() + (self.target_color.red() - self.current_color.red()) * self.color_lerp)
+            g = int(self.current_color.green() + (self.target_color.green() - self.current_color.green()) * self.color_lerp)
+            b = int(self.current_color.blue() + (self.target_color.blue() - self.current_color.blue()) * self.color_lerp)
+            self.current_color = QColor(r, g, b)
+            if self.color_lerp >= 1.0:
+                self.current_color = QColor(self.target_color)
+
         self.update()
+
+    def set_mood(self, mood):
+        """Sets the visual mood of the sphere."""
+        moods = {
+            "IDLE":      self.base_color,
+            "POSITIVE":  QColor("#ff00ff"), # Pink/Magenta
+            "NEGATIVE":  QColor("#ff4444"), # Red
+            "URGENT":    QColor("#ffaa00"), # Orange/Amber
+            "PROCESSING": QColor("#00ffaa"), # Cyan/Green
+        }
+        new_color = moods.get(mood.upper(), self.base_color)
+        if new_color != self.target_color:
+            self.current_color = QColor(self.target_color)
+            self.target_color = QColor(new_color)
+            self.color_lerp = 0.0
 
     def paintEvent(self, event):
         p = QPainter(self)
@@ -77,9 +110,7 @@ class KoraSphereWidget(QWidget):
 
         cx, cy = 180, 180
         sr = 110 # Core radius
-
-        theme = get_active_theme()
-        accent = QColor(theme["accent"])
+        accent = self.current_color
         
         # 1. Background Glow (Nebula)
         p.setCompositionMode(QPainter.CompositionMode.CompositionMode_Screen)
@@ -165,6 +196,7 @@ class KoraDashboard(QMainWindow):
     status_signal      = pyqtSignal(str)
     log_signal         = pyqtSignal(str, str)
     text_input_signal  = pyqtSignal(str)
+    mood_signal        = pyqtSignal(str)
     telemetry_signal   = pyqtSignal(dict)
     re_enable_input_signal = pyqtSignal()
 
@@ -427,6 +459,7 @@ class KoraDashboard(QMainWindow):
         self._init_tray()
         self.status_signal.connect(self.update_status)
         self.log_signal.connect(self.append_log)
+        self.mood_signal.connect(self.sphere_core.set_mood)
         self.telemetry_signal.connect(self.update_telemetry)
         self.re_enable_input_signal.connect(self._re_enable_input_on_main_thread)
 

@@ -4,12 +4,12 @@ import ollama
 from settings import get_setting
 from plugin_loader import load_plugins
 
+PLUGIN_DIR = os.path.join(os.path.dirname(__file__), "plugins")
+
 CREATE_PLUGIN_PATTERN = re.compile(
     r"^(?:create|write|make|generate)\s+(?:a\s+)?(?:plugin|skill)\s+(?:for|that|to)\s+(.+)$",
     re.IGNORECASE
 )
-
-PLUGIN_DIR = os.path.join(os.path.dirname(__file__), "plugins")
 
 def is_architect_request(text):
     normalized = " ".join(str(text).strip().split())
@@ -55,6 +55,9 @@ Write the code now.
 """
 
     try:
+        if not os.path.exists(PLUGIN_DIR):
+            os.makedirs(PLUGIN_DIR)
+
         print(f"[ARCHITECT] Generating plugin for: {objective}")
         response = ollama.chat(
             model=model_name,
