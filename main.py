@@ -667,7 +667,7 @@ if __name__ == "__main__":
     reminder_thread.start()
 
     # Start proactive vision
-    live_eye = LiveEye(hud.log_signal.emit, speak)
+    live_eye = LiveEye(hud.log_signal.emit, speak, command_queue=command_queue)
     live_eye.start()
 
     # Start knowledge watcher

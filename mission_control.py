@@ -5,6 +5,8 @@ from search_engine import search_online
 from url_summarizer import _fetch_text
 from file_ops import write_to_file
 from settings import get_setting
+from code_runner import handle_code_command
+from plugin_architect import handle_architect_command
 
 MISSION_PATTERN = re.compile(r"^(?:mission|task|complex task|orchestrate|plan)\s+(.+)$", re.I)
 
@@ -27,6 +29,8 @@ Available operations (ops):
 - SCRAPE: input="url", store_as="key"
 - SUMMARIZE: input="text", store_as="key"
 - WRITE_FILE: input={{"path": "file.txt", "content": "text"}}, store_as="key"
+- RUN_CODE: input="python_code", store_as="key"
+- CREATE_PLUGIN: input="plugin_objective", store_as="key"
 - SPEAK: input="message"
 
 Rules:
@@ -132,6 +136,14 @@ Example:
                         replies.append(f"Saved the file to {path}.")
                     else:
                         res = "Failed to write file."
+                elif op == "RUN_CODE":
+                    code_res = handle_code_command(inp)
+                    res = code_res.get("reply", "Code ran.")
+                    replies.append(f"Executed code. Result: {res[:100]}...")
+                elif op == "CREATE_PLUGIN":
+                    arch_res = handle_architect_command(f"create plugin for {inp}")
+                    res = arch_res.get("reply", "Plugin created.")
+                    replies.append(f"Built a new tool: {res[:100]}...")
                 elif op == "SPEAK":
                     replies.append(inp)
                     res = inp

@@ -6,12 +6,13 @@ from screen_analysis import capture_screen, get_available_vision_model
 from settings import get_setting
 
 class LiveEye(threading.Thread):
-    def __init__(self, ui_log_callback, speak_callback):
+    def __init__(self, ui_log_callback, speak_callback, command_queue=None):
         super().__init__(daemon=True)
         self.ui_log = ui_log_callback
         self.speak = speak_callback
+        self.command_queue = command_queue
         self.running = False
-        self.interval = 60 # seconds
+        self.interval = 45 # Slightly faster for proactivity
         self.last_observation = ""
 
     def run(self):
@@ -33,10 +34,19 @@ class LiveEye(threading.Thread):
             screenshot_path = capture_screen()
             
             prompt = """
-Analyze this screen. Is the user facing a clear problem, error, or waiting for something? 
-If you see a coding error, a slow download, or an interesting piece of news, provide a VERY SHORT proactive suggestion (1 sentence).
-If everything looks normal or private, output exactly one word: 'CLEAR'.
-Do not be annoying. Only speak up for high-value insights.
+Analyze this screen. Your goal is to be a PROACTIVE AI AGENT. 
+If you see:
+1. A coding error (Python traceback, terminal error): Suggest a fix or a research mission.
+2. An interesting topic/article: Offer to summarize or research it.
+3. A blank document or empty folder: Suggest a mission to populate it.
+4. An app you can control (Spotify, VS Code) in a stalled state: Suggest a fix.
+
+Format your response exactly as:
+REASON: [Why you are speaking up]
+PROPOSAL: [What mission/action you recommend]
+COMMAND: [The exact command the user should say, e.g., 'mission fix my code' or 'research AI news']
+
+If everything is CLEAR or normal, output: CLEAR
 """
             response = ollama.chat(
                 model=model_name,
@@ -50,8 +60,19 @@ Do not be annoying. Only speak up for high-value insights.
             observation = response["message"]["content"].strip()
             
             if observation.upper() != "CLEAR" and observation != self.last_observation:
-                self.ui_log("KORA (PROACTIVE)", observation)
-                self.speak(observation)
+                # Extract parts
+                parts = observation.split("\n")
+                summary = observation
+                for p in parts:
+                    if p.startswith("PROPOSAL:"):
+                        summary = p.replace("PROPOSAL:", "").strip()
+                    if p.startswith("COMMAND:") and self.command_queue:
+                        # Optional: We could automatically queue it if highly confident, 
+                        # but for now we just log it as a suggestion.
+                        pass
+
+                self.ui_log("KORA (PROACTIVE)", summary)
+                self.speak(f"I noticed something. {summary}")
                 self.last_observation = observation
                 
         except Exception as e:
