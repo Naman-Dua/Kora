@@ -37,6 +37,9 @@ from window_mgmt import handle_window_command, is_window_request
 from plugin_architect import handle_architect_command, is_architect_request
 from mission_control import MissionControl
 from self_healing import handle_self_healing
+from reflector import handle_reflector_command, is_reflector_request
+from gui_control import handle_gui_command, is_gui_request, autonomous_gui_action
+from morning_briefing import generate_morning_briefing, is_briefing_request as is_morning_briefing_request
 
 APPROVE_PATTERN = re.compile(r"^(?:approve|confirm|yes|do it|go ahead|proceed)$", re.IGNORECASE)
 REJECT_PATTERN = re.compile(r"^(?:reject|cancel that|no|never mind|dont do that|don't do that)$", re.IGNORECASE)
@@ -63,6 +66,50 @@ class OperatorState:
         self.last_action = None
         self.last_query = None
         self.mission_control = MissionControl()
+
+
+class CommandRegistry:
+    def __init__(self):
+        self.handlers = []
+
+    def register(self, checker, handler, name):
+        self.handlers.append({"checker": checker, "handler": handler, "name": name})
+
+    def get_handler(self, query):
+        for entry in self.handlers:
+            if entry["checker"](query):
+                return entry["handler"]
+        return None
+
+# Global registry initialization
+registry = CommandRegistry()
+# Registering all core modules
+registry.register(is_persona_request, handle_persona_command, "Persona")
+registry.register(is_theme_request, handle_theme_command, "Theme")
+registry.register(is_architect_request, handle_architect_command, "Architect")
+registry.register(is_plugin_request, handle_plugin_command, "Plugin")
+registry.register(is_skill_list_request, lambda q: {"action": "list_skills", "reply": describe_skills()}, "Skills")
+registry.register(is_clipboard_request, handle_clipboard_command, "Clipboard")
+registry.register(is_file_request, handle_file_command, "File")
+registry.register(is_gui_request, handle_gui_command, "GUI")
+registry.register(is_ingest_request, handle_ingest_command, "Ingest")
+registry.register(is_focus_request, handle_focus_command, "Focus")
+registry.register(is_media_request, handle_media_command, "Media")
+registry.register(is_window_request, handle_window_command, "Window")
+registry.register(is_weather_request, handle_weather_command, "Weather")
+registry.register(is_dictionary_request, handle_dictionary_command, "Dictionary")
+registry.register(is_translate_request, handle_translate_command, "Translate")
+registry.register(is_news_request, handle_news_command, "News")
+registry.register(is_url_summarize_request, handle_url_summarize_command, "URL Summarize")
+registry.register(is_export_request, handle_export_command, "Export")
+registry.register(is_code_request, handle_code_command, "Code")
+registry.register(is_system_request, handle_system_command, "System")
+registry.register(is_process_request, handle_process_command, "Process")
+registry.register(is_network_request, handle_network_command, "Network")
+registry.register(is_stopwatch_request, handle_stopwatch_command, "Stopwatch")
+registry.register(is_web_monitor_request, handle_web_monitor_command, "Web Monitor")
+registry.register(is_ocr_request, handle_ocr_command, "OCR")
+registry.register(is_morning_briefing_request, lambda q: generate_morning_briefing(), "Morning Briefing")
 
 
 def _should_require_confirmation(plan, settings):
@@ -221,15 +268,18 @@ def _handle_contextual_repeat(query, state, settings):
 
 def handle_operator_command(query, settings, state, reminder_manager=None):
     state.last_query = query
+    
+    # 1. High Priority System Checks (Approval/Cancel)
     approval_reply = _handle_approval(query, state, settings)
     if approval_reply:
         return approval_reply
 
-    # Contextual follow-ups
+    # 2. Contextual Logic
     repeat_reply = _handle_contextual_repeat(query, state, settings)
     if repeat_reply:
         return repeat_reply
 
+    # 3. Automation Management
     automation_reply = _handle_automation_commands(query, state)
     if automation_reply:
         return automation_reply
@@ -239,205 +289,41 @@ def handle_operator_command(query, settings, state, reminder_manager=None):
         pending = state.pending_approval["type"] if state.pending_approval else "none"
         return {"action": "operator_status", "reply": f"Operator is ready. Pending approval: {pending}."}
 
+    # 4. Mission Control (Requires State)
+    if state.mission_control.is_mission_request(query):
+        return state.mission_control.execute_mission(query)
+
+    # 5. Registry Dispatch (Core Modules)
+    handler = registry.get_handler(query)
+    if handler:
+        # Some handlers need extra arguments, we handle those specially or via lambda
+        if handler == handle_briefing_command:
+            result = handler(query, reminder_manager)
+        else:
+            result = handler(query)
+            
+        if result:
+            return _process_operator_result(result, query, settings)
+
+    # 6. Specialized Logic (Skills/Action Planning)
+    if is_screen_request(query):
+        workflow = {"type": "screen", "payload": {"query": query}}
+        reply = _execute_workflow(workflow, state, settings)
+        return {"action": "screen", "reply": reply}
+
+    if is_search_request(query):
+        workflow = {"type": "search", "payload": {"query": extract_search_query(query)}}
+        reply = _execute_workflow(workflow, state, settings)
+        return {"action": "search", "reply": reply}
+
+    # Task Memory / Focus Logic
     task_reply = handle_task_memory_command(query)
     if task_reply:
         workflow = {"type": "task_memory", "payload": task_reply}
         _set_last_workflow(state, workflow)
         return {"action": task_reply["action"], "reply": task_reply["reply"]}
 
-    # Personas
-    if is_persona_request(query):
-        result = handle_persona_command(query)
-        if result:
-            return result
-
-    # Themes
-    if is_theme_request(query):
-        result = handle_theme_command(query)
-        if result:
-            return result
-
-    # Plugin Architect
-    if is_architect_request(query):
-        result = handle_architect_command(query)
-        if result:
-            return result
-
-    # Mission Control
-    if state.mission_control.is_mission_request(query):
-        result = state.mission_control.execute_mission(query)
-        if result:
-            return result
-
-    # Plugins
-    if is_plugin_request(query):
-        result = handle_plugin_command(query)
-        if result:
-            return result
-
-    plugin_result = try_plugin_handle(query)
-    if plugin_result:
-        return plugin_result
-
-    if is_skill_list_request(query):
-        return {"action": "list_skills", "reply": describe_skills()}
-
-    # Clipboard
-    if is_clipboard_request(query):
-        result = _process_operator_result(handle_clipboard_command(query), query, settings)
-        if result:
-            return result
-
-    # File operations
-    if is_file_request(query):
-        result = _process_operator_result(handle_file_command(query), query, settings)
-        if result:
-            return result
-
-    # Document ingestion (RAG)
-    if is_ingest_request(query):
-        result = handle_ingest_command(query)
-        if result:
-            return result
-
-    # Daily Briefing
-    if is_briefing_request(query) and reminder_manager:
-        result = handle_briefing_command(query, reminder_manager)
-        if result:
-            return result
-
-    # Focus Mode
-    if is_focus_request(query):
-        result = handle_focus_command(query)
-        if result:
-            return result
-
-    # Media control
-    if is_media_request(query):
-        result = handle_media_command(query)
-        if result:
-            return result
-
-    # Window management
-    if is_window_request(query):
-        result = handle_window_command(query)
-        if result:
-            return result
-
-    # Weather
-    if is_weather_request(query):
-        result = handle_weather_command(query)
-        if result:
-            return result
-
-    # Dictionary
-    if is_dictionary_request(query):
-        result = handle_dictionary_command(query)
-        if result:
-            return result
-
-    # Translation
-    if is_translate_request(query):
-        result = handle_translate_command(query)
-        if result:
-            return result
-
-    # News
-    if is_news_request(query):
-        result = handle_news_command(query)
-        if result:
-            return result
-
-    # URL summarizer
-    if is_url_summarize_request(query):
-        result = handle_url_summarize_command(query)
-        if result:
-            return result
-
-    # Chat export
-    if is_export_request(query):
-        result = handle_export_command(query)
-        if result:
-            return result
-
-    # Code execution
-    if is_code_request(query):
-        result = handle_code_command(query)
-        if result:
-            return result
-
-    # System status
-    if is_system_request(query):
-        result = handle_system_command(query)
-        if result:
-            return result
-
-    # Process management
-    if is_process_request(query):
-        result = _process_operator_result(handle_process_command(query), query, settings)
-        if result:
-            return result
-
-    # Network tools
-    if is_network_request(query):
-        result = handle_network_command(query)
-        if result:
-            return result
-
-    # Stopwatch
-    if is_stopwatch_request(query):
-        result = handle_stopwatch_command(query)
-        if result:
-            return result
-
-    # Web monitor
-    if is_web_monitor_request(query):
-        result = handle_web_monitor_command(query)
-        if result:
-            return result
-
-    # Search
-    if is_search_request(query):
-        workflow = {"type": "search", "payload": {"query": extract_search_query(query)}}
-        reply = _execute_workflow(workflow, state, settings)
-        return {"action": "search", "reply": reply}
-
-    # OCR
-    if is_ocr_request(query):
-        result = handle_ocr_command(query)
-        if result:
-            return result
-
-    # Screen analysis
-    if is_screen_request(query):
-        workflow = {"type": "screen", "payload": {"query": query}}
-        reply = _execute_workflow(workflow, state, settings)
-        return {"action": "screen", "reply": reply}
-
-    skill_command = parse_skill_command(query)
-    if skill_command:
-        skill_name = skill_command["skill"]
-        payload = skill_command["payload"]
-        if skill_name == "research":
-            workflow = {"type": "search", "payload": {"query": payload}}
-            reply = _execute_workflow(workflow, state, settings)
-            return {"action": "skill_research", "reply": reply}
-        if skill_name == "vision":
-            workflow = {"type": "screen", "payload": {"query": payload}}
-            reply = _execute_workflow(workflow, state, settings)
-            return {"action": "skill_vision", "reply": reply}
-        if skill_name == "focus":
-            task_reply = handle_task_memory_command(f"focus on {payload}")
-            if task_reply:
-                workflow = {"type": "task_memory", "payload": task_reply}
-                _set_last_workflow(state, workflow)
-                return {"action": "skill_focus", "reply": task_reply["reply"]}
-        if skill_name == "automation":
-            return {
-                "action": "skill_automation",
-                "reply": "Use 'save this workflow as ...' after a workflow runs, or 'list automations'.",
-            }
-
+    # Action Planning (The final catch-all)
     plan = plan_action_command(query)
     if plan:
         workflow = {"type": "action_plan", "payload": plan}

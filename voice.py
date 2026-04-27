@@ -72,7 +72,7 @@ def _speak_with_windows_voice(text):
         "Add-Type -AssemblyName System.Speech; "
         "$speaker = New-Object System.Speech.Synthesis.SpeechSynthesizer; "
         "$speaker.Volume = 100; "
-        "$speaker.Rate = 0; "
+        "$speaker.Rate = 2; "
         f"$speaker.Speak('{escaped_text}');"
     )
     _run_powershell(script)
