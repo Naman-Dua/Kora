@@ -32,7 +32,6 @@ from settings import load_settings, save_settings
 from tasks import ReminderManager, check_for_tasks
 from voice import speak
 from mode_select import ask_mode
-from telegram_bridge import TelegramBridge
 from storage import log_telemetry, load_telemetry_summary
 from live_eye import LiveEye
 from knowledge_watcher import KnowledgeWatcher
@@ -705,9 +704,5 @@ if __name__ == "__main__":
     # Start knowledge watcher
     knowledge_watcher = KnowledgeWatcher(hud.log_signal.emit)
     knowledge_watcher.start()
-
-    # Start Telegram Bridge
-    tg_bridge = TelegramBridge(hud.log_signal.emit, speak)
-    tg_bridge.start()
 
     sys.exit(app.exec())

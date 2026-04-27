@@ -7,7 +7,7 @@ from kora_operator import handle_operator_command, OperatorState
 from settings import get_setting
 
 class TelegramBridge:
-    def __init__(self, ui_log_callback, speak_callback, operator_state):
+    def __init__(self, ui_log_callback, speak_callback):
         self.token = get_setting("telegram_token", "")
         self.chat_id = get_setting("telegram_chat_id", "") # Authorized chat ID
         self.base_url = f"https://api.telegram.org/bot{self.token}"
@@ -15,7 +15,7 @@ class TelegramBridge:
         self.speak = speak_callback
         self.last_update_id = 0
         self.running = False
-        self.operator_state = operator_state
+        self.operator_state = OperatorState()
 
     def send_message(self, text):
         if not self.token or not self.chat_id: return
@@ -47,44 +47,26 @@ class TelegramBridge:
                         
                         text = msg.get("text", "")
                         from_id = str(msg.get("from", {}).get("id", ""))
-
-                        # Basic Auth Check
-                        if self.chat_id and from_id != self.chat_id:
-                            print(f"[TELEGRAM] Unauthorized access attempt from {from_id}")
-                            continue
+                        if self.chat_id and from_id != self.chat_id: continue
+                        if not self.chat_id: self.chat_id = from_id
                         
-                        if not self.chat_id:
-                            print(f"[TELEGRAM] First message from {from_id}. Binding as owner.")
-                            self.chat_id = from_id
-                        
-                        print(f"[TELEGRAM] Received: {text}")
                         self.ui_log("MOBILE", text)
-                        
-                        # Process Command
                         res = handle_operator_command(text, {"model_name": "llama3.1:8b"}, self.operator_state)
                         if res:
-                            reply = res.get("reply", "Command executed.")
+                            reply = res.get("reply", "Done.")
                             self.send_message(reply)
-                            self.speak(reply) # Optional: Speak on PC too
-                            
                             if "screenshot" in text.lower():
                                 screenshot_path = "mobile_screen.png"
                                 ImageGrab.grab().save(screenshot_path)
                                 self.send_photo(screenshot_path)
                                 os.remove(screenshot_path)
-                        else:
-                            self.send_message("I'm not sure how to handle that remote command.")
-
-            except Exception as e:
-                print(f"[TELEGRAM ERROR]: {e}")
-                time.sleep(10)
+            except: time.sleep(10)
 
     def start(self):
         if not self.token: return
         self.running = True
         self.thread = threading.Thread(target=self.poll, daemon=True)
         self.thread.start()
-        print("[TELEGRAM] Bridge started.")
 
     def stop(self):
         self.running = False
