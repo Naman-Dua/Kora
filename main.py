@@ -42,6 +42,21 @@ try:
     from knowledge_watcher import KnowledgeWatcher
 except ImportError:
     KnowledgeWatcher = None
+
+try:
+    from energy_monitor import energy_monitor
+except ImportError:
+    energy_monitor = None
+
+try:
+    from error_recovery import error_recovery_manager
+except ImportError:
+    error_recovery_manager = None
+
+try:
+    from intelligent_cache import cache_manager
+except ImportError:
+    cache_manager = None
 # Set by the startup dialog — "voice", "text", or "both"
 INPUT_MODE = "both"   # overwritten at launch
 
@@ -711,6 +726,28 @@ if __name__ == "__main__":
             live_eye.start()
         except Exception as e:
             hud.log_signal.emit("SYSTEM", f"Vision System (LiveEye) initialization: {e}")
+
+    # Start energy monitoring
+    if energy_monitor:
+        try:
+            energy_monitor.start_monitoring(interval=60)  # Monitor every 60 seconds
+            hud.log_signal.emit("SYSTEM", "Energy monitoring system started.")
+        except Exception as e:
+            hud.log_signal.emit("SYSTEM", f"Energy monitoring initialization: {e}")
+
+    # Initialize error recovery system
+    if error_recovery_manager:
+        try:
+            hud.log_signal.emit("SYSTEM", "Error recovery system initialized.")
+        except Exception as e:
+            hud.log_signal.emit("SYSTEM", f"Error recovery initialization: {e}")
+
+    # Initialize caching system
+    if cache_manager:
+        try:
+            hud.log_signal.emit("SYSTEM", "Intelligent caching system initialized.")
+        except Exception as e:
+            hud.log_signal.emit("SYSTEM", f"Caching system initialization: {e}")
 
     # Start knowledge watcher
     if KnowledgeWatcher:

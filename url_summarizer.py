@@ -24,7 +24,9 @@ def _extract_url(text):
             return m.group(1).strip()
     return None
 
+from intelligent_cache import cache_api_response
 
+@cache_api_response(ttl=3600) # Cache webpage content for 1 hour
 def _fetch_text(url, max_chars=4000):
     try:
         r = requests.get(url, timeout=10, headers={"User-Agent": "Mozilla/5.0"})

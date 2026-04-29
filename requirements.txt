@@ -1,3 +1,5 @@
+
+
 # Core UI and Logic
 PyQt6
 ollama
@@ -27,3 +29,33 @@ pywin32
 
 # Vision (Fully Functional on 3.14 via mss)
 # No Pillow needed!
+
+
+Viewed main.py:235-251
+Ran command: `claude --resume 81e0cd16-86f1-4145-81b7-b32f71204eab`
+
+This is an incredible roadmap! Since you already have a solid foundation with Jarvis/Kora (including memory, screen analysis, voice interaction, and our newly added caching/error recovery systems), here are the features from your list that would be **the best to prioritize next** based on high impact and natural fit with your current architecture:
+
+### 🏆 Top Recommendations (High Impact, Natural Fit)
+
+**1. Context-Aware Responses & Better Memory (from Advanced AI)**
+*Why:* You already have an LLM-based memory module. Enhancing Kora so she proactively uses this memory to personalize responses will make her feel truly "alive" and intelligent, rather than just a command-and-response bot.
+
+**2. System Monitor Panel & Quick Actions (from Dashboard Widgets)**
+*Why:* You already import `psutil` and have a premium GUI. Adding live CPU/RAM/GPU graphs and a drag-and-drop grid for frequent commands will make the dashboard highly functional and visually impressive (fitting the glassmorphic theme).
+
+**3. Object Recognition & Document OCR (from Advanced Vision)**
+*Why:* You've already integrated local vision models (like Moondream) for screen analysis. Taking this a step further to let Kora read documents on screen or identify specific UI elements would make her a powerhouse for productivity and automation.
+
+**4. The "Quick Wins" (Shortcuts, Sounds, Tooltips)**
+*Why:* These are extremely low effort but provide massive UX improvements. Global keyboard shortcuts to wake Kora up and satisfying sound effects for her interactions will make the system feel polished and premium immediately.
+
+**5. Code Assistant Mode (from Advanced AI)**
+*Why:* Since you are actively developing this, having a specialized mode where Kora can read your IDE, understand the context, and provide syntax-highlighted code directly in the GUI would be immensely helpful for your own workflow.
+
+### 🌟 Great for the Future (But Maybe Wait)
+- **Interactive 3D Elements (Gesture/Voice Visualization):** These are very cool, but can be resource-heavy and complex to get right without causing lag. 
+- **Smart Home & IoT:** Great feature, but requires a lot of external API integrations and varying local network setups. Better to build the core AI first.
+- **Plugin Marketplace:** Excellent for long-term scalability, but you need the core system fully stabilized before opening it up to third-party code.
+
+**Summary:** I recommend focusing on **System Monitoring/Quick Actions** to flesh out the GUI, **Context-Aware Memory** to make her smarter, and the **Quick Wins** for immediate polish! Let me know what you think.

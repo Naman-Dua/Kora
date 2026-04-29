@@ -1,6 +1,8 @@
 import ollama
 import json
+from intelligent_cache import cache_llm_response
 
+@cache_llm_response(ttl=86400) # Cache fact extractions for 24 hours
 def extract_facts(text, model_name="llama3.1:8b"):
     """
     Uses the local LLM to extract facts, preferences, and important memory points.

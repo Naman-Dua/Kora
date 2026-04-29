@@ -11,7 +11,7 @@ from dictionary_lookup import (
     is_dictionary_request,
     is_translate_request,
 )
-from daily_briefing import handle_briefing_command, is_briefing_request
+
 from file_ops import handle_file_command, is_file_request
 from focus_mode import handle_focus_command, is_focus_request
 from ingest_docs import handle_ingest_command, is_ingest_request
@@ -40,6 +40,10 @@ from self_healing import handle_self_healing
 from reflector import handle_reflector_command, is_reflector_request
 from gui_control import handle_gui_command, is_gui_request, autonomous_gui_action
 from morning_briefing import generate_morning_briefing, is_briefing_request as is_morning_briefing_request
+from energy_monitor import handle_energy_command, is_energy_request
+from error_recovery import handle_error_recovery_command, is_error_recovery_request
+from intelligent_cache import handle_cache_command, is_cache_request
+from email_assistant import handle_email_command, is_email_request
 
 APPROVE_PATTERN = re.compile(r"^(?:approve|confirm|yes|do it|go ahead|proceed)$", re.IGNORECASE)
 REJECT_PATTERN = re.compile(r"^(?:reject|cancel that|no|never mind|dont do that|don't do that)$", re.IGNORECASE)
@@ -110,6 +114,10 @@ registry.register(is_stopwatch_request, handle_stopwatch_command, "Stopwatch")
 registry.register(is_web_monitor_request, handle_web_monitor_command, "Web Monitor")
 registry.register(is_ocr_request, handle_ocr_command, "OCR")
 registry.register(is_morning_briefing_request, lambda q: generate_morning_briefing(), "Morning Briefing")
+registry.register(is_energy_request, handle_energy_command, "Energy Monitor")
+registry.register(is_error_recovery_request, handle_error_recovery_command, "Error Recovery")
+registry.register(is_cache_request, handle_cache_command, "Cache")
+registry.register(is_email_request, handle_email_command, "Email Assistant")
 
 
 def _should_require_confirmation(plan, settings):
@@ -296,11 +304,7 @@ def handle_operator_command(query, settings, state, reminder_manager=None):
     # 5. Registry Dispatch (Core Modules)
     handler = registry.get_handler(query)
     if handler:
-        # Some handlers need extra arguments, we handle those specially or via lambda
-        if handler == handle_briefing_command:
-            result = handler(query, reminder_manager)
-        else:
-            result = handler(query)
+        result = handler(query)
             
         if result:
             return _process_operator_result(result, query, settings)
